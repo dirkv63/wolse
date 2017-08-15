@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+{% import "macros.html" as macros with context %}
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block page_content %}
+<h2><a href="{{ url_for('main.race_list', org_id=org_id) }}">{{ race_label }}</a></h2>
+{% if current_user.is_authenticated %}
+    <ul>
+    <li><a href="{{ url_for('main.race_edit', race_id=race_id, org_id=org_id) }}">Wedstrijdlabel aanpassen</a></li>
+    {% if finishers is defined %}
+        <li>Wedstrijd verwijderen is enkel mogelijk als er geen deelnemers meer bij de wedstrijd horen.</li>
+    {% else %}
+        <li><a href="{{ url_for('main.race_delete', race_id=race_id) }}">Wedstrijd verwijderen</a></li>
+    {% endif %}
+    </ul>
+{% endif %}
+<div class="row">
+{{ macros.race_finishers(finishers, race_id) }}
+{% if current_user.is_authenticated %}
+    <div class="col-md-3">
+        <h3>{{ person['label'] }}</h3>
+        {{ wtf.quick_form(form) }}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
