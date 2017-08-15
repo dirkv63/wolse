@@ -9,14 +9,6 @@ from lib import my_env
 
 if __name__ == "__main__":
     my_env.init_loghandler(__file__, "c:\\temp\\log", "info")
-    neo4j_params = {
-        'user': "neo4j",
-        'password': "_m8z8IpJUPyR",
-        'db': "stratenloop15.db"
-    }
-    ns = neostore.NeoStore(**neo4j_params)
-    nodes = ns.get_nodes()
-    for node in nodes:
-        nid = node["nid"]
-        if isinstance(nid, int):
-            ns.node_set_nid(nid)
+    ns = neostore.NeoStore()
+    res = ns.get_nodes_no_nid()
+    print("Nodes updated: {r}".format(r=res))

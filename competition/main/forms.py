@@ -7,7 +7,8 @@ import wtforms.validators as wtv
 class PersonAdd(Form):
     name = StringField('Naam: ', validators=[wtv.InputRequired(), wtv.Length(1, 24)])
     mf = RadioField(choices=[('man', 'man'), ('vrouw', 'vrouw')], default='man', validators=[wtv.InputRequired()])
-    born = DateField('Geboren: ', validators=[wtv.Optional()])
+    category = SelectField('Categorie: ', coerce=str)
+    # born = DateField('Geboren: ', validators=[wtv.Optional()])
     submit = SubmitField('OK')
 
 

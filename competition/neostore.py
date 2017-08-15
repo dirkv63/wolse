@@ -230,6 +230,20 @@ class NeoStore:
             return False
         return rec["name"]
 
+    def get_category_nodes(self):
+        """
+        This function returns the category nodes in sequence
+        :return:
+        """
+        res = []
+        query = "MATCH (n:Category) RETURN n ORDER BY n.seq"
+        cursor = self.graph.run(query)
+        while cursor.forward():
+            rec = cursor.current()
+            res.append(rec["n"])
+        return res
+
+
     def get_end_nodes(self, start_node_id=None, rel_type=None):
         """
         This method will calculate all end nodes from a start Node ID and a relation type. If relation type is not

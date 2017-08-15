@@ -53,11 +53,15 @@ def person_add(person_id=None):
             person_dict = person.props()
             name = person_dict['name']
             mf = person.get_mf()
-            form = PersonAdd(mf=mf)
+            if person.get_category():
+                cat_nid = person.get_category()["nid"]
+                form = PersonAdd(mf=mf, category=cat_nid)
+            else:
+                form = PersonAdd(mf=mf)
             form.name.data = name
-            if 'born' in person_dict:
-                bornstr = person_dict['born']
-                form.born.data = my_env.datestr2date(bornstr)
+            # if 'born' in person_dict:
+            #     bornstr = person_dict['born']
+            #     form.born.data = my_env.datestr2date(bornstr)
         else:
             name = None
             form = PersonAdd()
@@ -65,25 +69,27 @@ def person_add(person_id=None):
         # request.method == "POST":
         form = PersonAdd()
         name = None
-        if form.validate_on_submit():
-            person_dict = dict(name=form.name.data)
-            person_mf = form.mf.data
-            if form.born.data:
-                person_dict['born'] = form.born.data.strftime('%Y-%m-%d')
-            name = person_dict['name']
-            if person_id:
-                # This is from person edit function
-                current_app.logger.debug("Person Dictionary: {person_dict}".format(person_dict=person_dict))
-                person = mg.Person(person_id=person_id)
-                person.edit(**person_dict)
+        # if form.validate_on_submit(): Doesn't work with SelectField
+        person_dict = dict(name=form.name.data)
+        person_mf = form.mf.data
+        # if form.born.data:
+        #     person_dict['born'] = form.born.data.strftime('%Y-%m-%d')
+        name = person_dict['name']
+        if person_id:
+            # This is from person edit function
+            current_app.logger.debug("Person Dictionary: {person_dict}".format(person_dict=person_dict))
+            person = mg.Person(person_id=person_id)
+            person.edit(**person_dict)
+            person.set_mf(person_mf)
+        else:
+            person = mg.Person()
+            if person.add(**person_dict):
                 person.set_mf(person_mf)
             else:
-                person = mg.Person()
-                if person.add(**person_dict):
-                    person.set_mf(person_mf)
-                else:
-                    flash(name + ' bestaat reeds, niet toegevoegd.', "warning")
-            return redirect(url_for('main.person_add'))
+                flash(name + ' bestaat reeds, niet toegevoegd.', "warning")
+        person.set_category(form.category.data)
+        return redirect(url_for('main.person_add'))
+    form.category.choices = mg.get_category_list()
     persons = mg.person_list(nr_races=True)
     return render_template('person_add.html', form=form, name=name, persons=persons)
 

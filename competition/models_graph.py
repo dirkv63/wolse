@@ -8,6 +8,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # Todo: Get Username / Password from environment settings
 ns = neostore.NeoStore()
 
+# Define Relation Types
+inCategory = "inCategory"
+
 
 class User(UserMixin):
     """
@@ -399,6 +402,18 @@ class Person:
         else:
             return False
 
+    def get_category(self):
+        """
+        This method will get the category node for the person.
+        :return:
+        """
+        cat_node_id = ns.get_end_node(start_node_id=self.person_id, rel_type=inCategory)
+        if cat_node_id:
+            cat_node = ns.node(cat_node_id)
+            return cat_node
+        else:
+            return False
+
     def active(self):
         """
         This method will check if a person is active. For now, this means that a person has 'participates' links.
@@ -438,6 +453,26 @@ class Person:
         props = dict(name=mf_inv_tx[mf_label])
         mf_node = ns.get_node("MF", **props)
         ns.create_relation(from_node=person_node, rel="mf", to_node=mf_node)
+        return True
+
+    def set_category(self, cat_nid):
+        """
+        This method will set the person in the Category specified by the cat_nid. The assumption is that cat_nid is the
+        nid of a category.
+        In case the person is already assigned to the category, nothing will be done.
+        :param cat_nid:
+        :return: True
+        """
+        current_cat_node = self.get_category()
+        if current_cat_node:
+            if current_cat_node["nid"] == cat_nid:
+                # OK, person assigned to required category already
+                return
+            else:
+                # Change category for person by removing Category first
+                ns.remove_relation(start_nid=self.person_id, end_nid=current_cat_node["nid"], rel_type=inCategory)
+        # No category for person (anymore), add person to category
+        ns.create_relation(from_node=ns.node(self.person_id), to_node=ns.node(cat_nid), rel=inCategory)
         return True
 
 
@@ -1157,6 +1192,15 @@ def get_cat4part(part_nid):
     @return: Category (Dames or Heren), or False if no category could be found.
     """
     return ns.get_cat4part(part_nid)
+
+
+def get_category_list():
+    """
+    This method will return the category list in sequence Young to Old. Category items are returned in list of tuples
+    with nid and category name
+    :return:
+    """
+    return [(catn["nid"], catn["name"]) for catn in ns.get_category_nodes()]
 
 
 def points_position(pos):
