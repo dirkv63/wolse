@@ -1,5 +1,6 @@
-import logging
-# import os
+# import logging
+import os
+from competition import neostore
 from config import config
 from flask import Flask
 from flask_bootstrap import Bootstrap
@@ -9,7 +10,6 @@ from lib import my_env
 bootstrap = Bootstrap()
 lm = LoginManager()
 lm.login_view = 'main.login'
-ns = ""
 
 
 def create_app(config_name):
@@ -30,15 +30,17 @@ def create_app(config_name):
     # initialize extensions
     bootstrap.init_app(app)
     lm.init_app(app)
+
+    os.environ['Neo4J_User'] = app.config.get('NEO4J_USER')
+    os.environ['Neo4J_Pwd'] = app.config.get('NEO4J_PWD')
+    os.environ['Neo4J_Db'] = app.config.get('NEO4J_DB')
     """
-    node_params = {
-        'wedstrijd': app.config.get('WEDSTRIJD'),
-        'o_deelname': app.config.get('O_DEELNAME'),
-        'hoofdwedstrijd': app.config.get('HOOFDWEDSTRIJD'),
-        'bijwedstrijd': app.config.get('BIJWEDSTRIJD'),
-        'deelname': app.config.get('DEELNAME')
+    neo4j_params = {
+        'user': app.config.get('NEO4J_USER'),
+        'password': app.config.get('NEO4J_PWD'),
+        'db': app.config.get('NEO4J_DB')
     }
-    ns.init_graph(**node_params)
+    g.ns = neostore.NeoStore()
     """
 
     # import blueprints

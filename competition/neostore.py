@@ -19,28 +19,31 @@ from py2neo.ext.calendar import GregorianCalendar
 
 class NeoStore:
 
-    def __init__(self):
+    def __init__(self, **neo4j_params):
         """
         Method to instantiate the class in an object for the neostore.
-        @return: Object to handle neostore commands.
+
+        :param neo4j_params: dictionary with Neo4J User, Pwd and Database
+
+        :return: Object to handle neostore commands.
         """
-        self.graph = self.connect2db()
+        self.graph = self.connect2db(**neo4j_params)
         # self.graph = self.connect2graphene()
         self.calendar = GregorianCalendar(self.graph)
         self.selector = NodeSelector(self.graph)
         return
 
     @staticmethod
-    def connect2db():
+    def connect2db(**neo4j_params):
         """
         Internal method to create a database connection. This method is called during object initialization.
         @return: Database handle and cursor for the database.
-        """
         neo4j_params = {
             'user': "neo4j",
-            'password': "_m8z8IpJUPyR",
+            'password': "6H0sehEpbOkI",
             'db': "winter17.db"
         }
+        """
         neo4j_config = {
             'user': neo4j_params['user'],
             'password': neo4j_params["password"],
@@ -242,7 +245,6 @@ class NeoStore:
             rec = cursor.current()
             res.append(rec["n"])
         return res
-
 
     def get_end_nodes(self, start_node_id=None, rel_type=None):
         """

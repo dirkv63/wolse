@@ -1,12 +1,20 @@
 import logging
+import os
 from . import lm
+# from . import ns
 from competition import neostore
+from flask import current_app
 from flask_login import UserMixin
 # from lib import my_env
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # Todo: Get Username / Password from environment settings
-ns = neostore.NeoStore()
+neo4j_params = dict(
+    user=os.environ.get('Neo4J_User'),
+    password=os.environ.get('Neo4J_Pwd'),
+    db=os.environ.get('Neo4J_Db')
+)
+ns = neostore.NeoStore(**neo4j_params)
 
 # Define Relation Types
 inCategory = "inCategory"
@@ -1329,9 +1337,12 @@ def points_sum(point_list):
     """
     This function will calculate the total of the points for this participant. For now, the sum of all points is
     calculated.
+
     :param point_list: list of the points for the participant.
+
     :return: sum of the points
     """
+    # Todo: points for 'deelname' should be calculated separately and in full
     nr_races = 7
     add_points_per_race = 10
     max_list = sorted(point_list)[-nr_races:]
@@ -1345,7 +1356,8 @@ def points_sum(point_list):
 
 def results_for_category(cat):
     """
-    This method will calculate the points for all participants in a category.
+    This method will calculate the points for all participants in a category. Split up in points for wedstrijd and
+    points for deelname at this point.
 
     :param cat: Category to calculate the points
 
