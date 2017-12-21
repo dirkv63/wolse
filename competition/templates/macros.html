@@ -120,10 +120,9 @@
                 <th>Type</th>
                 <th>Punten</th>
             </tr>
-            {% set cnt = 1 %}
             {% for row in races %}
             <tr>
-                <td>{{ cnt }}</td>
+                <td>{{ loop.index }}</td>
                 <td>
                     <a href="{{ url_for('main.race_list',  org_id=row.org.nid) }}">
                         {{ row.org.name }}
@@ -144,7 +143,6 @@
                     {{ row.part.points }}
                 </td>
             </tr>
-            {% set cnt = cnt + 1 %}
             {% endfor %}
         </table>
     </div>
