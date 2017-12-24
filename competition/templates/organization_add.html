@@ -3,11 +3,19 @@
 {% import "bootstrap/wtf.html" as wtf %}
 
 {% block page_content %}
-<h1>Organisatie Toevoegen</h1>
 <div class="row">
-    {{ macros.org_list(organizations) }}
+    <div class="col-md-5">
+        <h1>Kalender</h1>
+        {{ macros.org_list(organizations) }}
+    </div>
     <div class="col-md-3">
+        <h1>Organizatie</h1>
         {{ wtf.quick_form(form) }}
+    </div>
+    <div class="col-md-4 text-center">
+        <div class="hidden-xs hidden-sm logo">
+            <img class="img-responsive center-block"  src="{{ url_for('static', filename='olseac.jpg') }}">
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -341,11 +341,15 @@ def participant_list(race_id):
     :param race_id:
     :return:
     """
-    race_label = mg.race_label(race_id)
-    org_id = mg.get_org_id(race_id=race_id)
+    param_dict = dict(
+        race_label=mg.race_label(race_id),
+        org_id=mg.get_org_id(race_id=race_id),
+        race_id=race_id
+    )
     finishers = mg.participant_seq_list(race_id)
-    return render_template('participant_list.html', finishers=finishers, race_label=race_label, race_id=race_id,
-                           org_id=org_id)
+    if finishers:
+        param_dict['finishers'] = finishers
+    return render_template('participant_list.html', **param_dict)
 
 
 @main.route('/participant/<race_id>/add', methods=['GET', 'POST'])

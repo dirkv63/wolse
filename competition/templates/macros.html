@@ -1,22 +1,20 @@
 {% macro org_list(organizations) %}
-    <div class="col-md-6">
-        <table class="table table-hover">
+    <table class="table table-hover">
+        <tr>
+            <th>Datum</th>
+            <th>Naam</th>
+            <th>Plaats</th>
+            <th>Type</th>
+        </tr>
+        {% for row in organizations %}
             <tr>
-                <th>Datum</th>
-                <th>Naam</th>
-                <th>Plaats</th>
-                <th>Type</th>
+                <td>{{ row.date }}</td>
+                <td><a href="{{ url_for('main.race_list', org_id=row.id) }}">{{ row.organization }}</a></td>
+                <td>{{ row.city }}</td>
+                <td>{{ row.type }}</td>
             </tr>
-            {% for row in organizations %}
-                <tr>
-                    <td>{{ row.date }}</td>
-                    <td><a href="{{ url_for('main.race_list', org_id=row.id) }}">{{ row.organization }}</a></td>
-                    <td>{{ row.city }}</td>
-                    <td>{{ row.type }}</td>
-                </tr>
-            {% endfor %}
-        </table>
-    </div>
+        {% endfor %}
+    </table>
 {% endmacro %}
 
 {% macro part_row(name, part_id) %}

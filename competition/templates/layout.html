@@ -5,7 +5,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 {% endblock %}
 
-{% block title %}OLSE Winter 16-17{% endblock %}
+{% block title %}OLSE Winter 17-18{% endblock %}
 
 {% block navbar %}
     <nav class="navbar navbar-inverse" role="navigation">
@@ -107,7 +107,10 @@
         {% endfor %}
     {% endif %}
     {% endwith %}
+</div>
 
-    {% block page_content %}{% endblock %}
+<div class="container">
+    {% block page_content %}
+    {% endblock %}
 </div>
 {% endblock %}
