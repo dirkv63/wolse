@@ -110,7 +110,18 @@
 </div>
 
 <div class="container">
-    {% block page_content %}
-    {% endblock %}
+    <div class="row">
+        <div class="col-sm-9">
+            {% block page_content %}
+            {% endblock %}
+        </div>
+        <div class="col-sm-3  text-center">
+            <div class="hidden-xs logo">
+                <img class="img-responsive center-block"  src="{{ url_for('static', filename='olseac.jpg') }}">
+            </div>
+            {% block sidebar %}
+            {% endblock %}
+        </div>
+    </div>
 </div>
 {% endblock %}

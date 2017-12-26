@@ -2,15 +2,22 @@
 {% import "macros.html" as macros %}
 
 {% block page_content %}
-<div class="row">
-    {{ macros.person_list(persons) }}
-</div>
-
-{% if current_user.is_authenticated %}
-<div class="row">
-    <div class="col-md-3">
-    <a href="{{ url_for('main.person_add') }}" class="btn btn-default" role="button">Deelnemer Toevoegen</a>
+    <div class="row">
+        <div class="col-md-4">
+            <h1>Overzicht</h1>
+            {{ macros.person_list(persons) }}
+        </div>
     </div>
-</div>
-{% endif %}
+{% endblock %}
+
+{% block sidebar %}
+    {% if current_user.is_authenticated %}
+        <div class="actions">
+            <h3>Acties</h3>
+            <hr>
+            <div class="btn-group-vertical" role="group" aria-label="Actions">
+                <a href="{{ url_for('main.person_add') }}" class="btn btn-default" role="button">Deelnemer Toevoegen</a>
+            </div>
+        </div>
+    {% endif %}
 {% endblock %}

@@ -2,15 +2,10 @@
 {% import "bootstrap/wtf.html" as wtf %}
 
 {% block page_content %}
-<div class="row">
-    <div class="col-sm-3">
-        <h1>Login</h1>
-        {{ wtf.quick_form(form) }}
-    </div>
-    <div class="col-sm-4 col-sm-offset-5 text-center">
-        <div class="hidden-xs logo">
-            <img class="img-responsive center-block"  src="{{ url_for('static', filename='olseac.jpg') }}">
+    <div class="row">
+        <div class="col-xs-6">
+            <h1>Login</h1>
+            {{ wtf.quick_form(form) }}
         </div>
     </div>
-</div>
 {% endblock %}

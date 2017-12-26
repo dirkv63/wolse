@@ -3,25 +3,39 @@
 {% import "bootstrap/wtf.html" as wtf %}
 
 {% block page_content %}
-<h2><a href="{{ url_for('main.race_list', org_id=org_id) }}">{{ race_label }}</a></h2>
-{% if current_user.is_authenticated %}
-    <ul>
-    <li><a href="{{ url_for('main.race_edit', race_id=race_id, org_id=org_id) }}">Wedstrijdlabel aanpassen</a></li>
-    {% if finishers is defined %}
-        <li>Wedstrijd verwijderen is enkel mogelijk als er geen deelnemers meer bij de wedstrijd horen.</li>
-    {% else %}
-        <li><a href="{{ url_for('main.race_delete', race_id=race_id) }}">Wedstrijd verwijderen</a></li>
-    {% endif %}
-    </ul>
-{% endif %}
 <div class="row">
-{{ macros.race_finishers(finishers, race_id) }}
-{% if current_user.is_authenticated %}
-    <div class="col-md-3">
-        {{ wtf.quick_form(form) }}
-        <br>
-        <a href="{{ url_for('main.person_add') }}" class="btn btn-default" role="button">Deelnemer Toevoegen</a>
+    <h1><a href="{{ url_for('main.race_list', org_id=org_id) }}">{{ race_label }}</a></h1>
+    <div class="col-md-8">
+        {{ macros.race_finishers(finishers, race_id) }}
     </div>
+    {% if current_user.is_authenticated %}
+        <div class="col-md-4">
+            <h2>Deelnemer</h2>
+            {{ wtf.quick_form(form) }}
+        </div>
+    {% endif %}
 </div>
-{% endif %}
+{% endblock %}
+
+{% block sidebar %}
+    {% if current_user.is_authenticated %}
+         <div class="actions">
+             <h3>Acties</h3>
+             <hr>
+             <div class="btn-group-vertical" role="group" aria-label="Actions">
+                 <a href="{{ url_for('main.person_add') }}" class="btn btn-default" role="button">
+                     Nieuwe Deelnemer
+                 </a>
+                 <a href="{{ url_for('main.race_edit', race_id=race_id, org_id=org_id) }}" class="btn btn-default"
+                   role="button">
+                    Wedstrijdlabel aanpassen
+                 </a>
+                 {% if finishers is not defined %}
+                    <a href="{{ url_for('main.race_delete', race_id=race_id) }}" class="btn btn-default" role="button">
+                        Wedstrijd verwijderen
+                    </a>
+                 {% endif %}
+             </div>
+         </div>
+    {% endif %}
 {% endblock %}

@@ -1,89 +1,84 @@
 {% extends "layout.html" %}
 {% block page_content %}
-<div class="row">
-    <div class="col-sm-8">
-        <h2>{{ org_label }}</h2>
-        <table class="table table-hover">
-            <tr>
-                <th>Wedstrijden</th>
-                <th>Type</th>
-            </tr>
-            {% for row in races %}
-            <tr>
-                <td>
-                    <a href="{{ url_for('main.participant_list', race_id=row.race_id, org_id=org_id) }}">
-                        {{ row.race}}
-                    </a>
-                </td>
-                <td>
-                    {% if current_user.is_authenticated %}
-                        {% if row.type is equalto "Hoofdwedstrijd" %}
-                            <a href="{{ url_for('main.hoofdwedstrijd_remove', race_id=row.race_id, org_id=org_id) }}">
-                        {% endif %}
-                        {% if set_hoofdwedstrijd is equalto "Yes" %}
-                            <a href="{{ url_for('main.hoofdwedstrijd_set', race_id=row.race_id, org_id=org_id) }}">
-                        {% endif %}
+    <h2>{{ org_label }}</h2>
+    <table class="table table-hover">
+        <tr>
+            <th>Wedstrijden</th>
+            <th>Type</th>
+        </tr>
+        {% for row in races %}
+        <tr>
+            <td>
+                <a href="{{ url_for('main.participant_list', race_id=row.race_id, org_id=org_id) }}">
+                    {{ row.race}}
+                </a>
+            </td>
+            <td>
+                {% if current_user.is_authenticated %}
+                    {% if row.type is equalto "Hoofdwedstrijd" %}
+                        <a href="{{ url_for('main.hoofdwedstrijd_remove', race_id=row.race_id, org_id=org_id) }}">
                     {% endif %}
-                        {{ row.type }}
-                    {% if current_user.is_authenticated %}
-                        {% if row.type is equalto "Hoofdwedstrijd" %}
-                            </a>
-                        {% endif %}
-                        {% if set_hoofdwedstrijd is equalto "Yes" %}
-                            </a>
-                        {% endif %}
+                    {% if set_hoofdwedstrijd is equalto "Yes" %}
+                        <a href="{{ url_for('main.hoofdwedstrijd_set', race_id=row.race_id, org_id=org_id) }}">
                     {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </table>
-    </div>
-    <div class="col-sm-4 text-center">
-        <div class="hidden-xs logo">
-            <img class="img-responsive center-block"  src="{{ url_for('static', filename='olseac.jpg') }}">
-        </div>
-        {% if current_user.is_authenticated %}
-        <br>
-        <div class="btn-group">
-            <a href="{{ url_for('main.race_add', org_id=org_id) }}" class="btn btn-default">
-                Wedstrijd toevoegen
-            </a>
-            <a href="{{ url_for('main.organization_edit', org_id=org_id) }}" class="btn btn-default">
-                Organizatie aanpassen
-            </a>
-            {% if remove_org is equalto "Yes" %}
-                <!-- Button trigger modal -->
-                <button type="button" class="btn btn-default" data-toggle="modal" data-target="#myModal">
-                    Organizatie Verwijderen
-                </button>
-                <!-- Modal code -->
-                <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel"
-                     aria-hidden="true">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-                                <h3 class="modal-title">OK om te verwijderen?</h3>
-                            </div>
-                            <div class="modal-body">
-                                <p>Bevestig verwijderen van organizatie <strong>{{ org_label }}</strong>!</p>
-                            </div>
-                            <div class="modal-footer">
-                                <a href="{{ url_for('main.organization_delete', org_id=org_id) }}" class="btn btn-danger" role="button">
-                                    Verwijderen
-                                </a>
-                                <a href="{{ url_for('main.race_list', org_id=org_id) }}" class="btn btn-warning" role="button">
-                                    Annuleer
-                                </a>
+                {% endif %}
+                    {{ row.type }}
+                {% if current_user.is_authenticated %}
+                    {% if row.type is equalto "Hoofdwedstrijd" %}
+                        </a>
+                    {% endif %}
+                    {% if set_hoofdwedstrijd is equalto "Yes" %}
+                        </a>
+                    {% endif %}
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+{% endblock %}
+
+{% block sidebar %}
+    {% if current_user.is_authenticated %}
+        <div class="actions">
+            <h3>Acties</h3>
+            <hr>
+            <div class="btn-group-vertical" role="group" aria-label="Actions">
+                <a href="{{ url_for('main.organization_edit', org_id=org_id) }}" class="btn btn-default">
+                    Organizatie aanpassen
+                </a>
+                {% if remove_org is equalto "Yes" %}
+                    <!-- Button trigger modal -->
+                    <button type="button" class="btn btn-default" data-toggle="modal" data-target="#myModal">
+                        Organizatie Verwijderen
+                    </button>
+                    <!-- Modal code -->
+                    <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel"
+                         aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                                    <h3 class="modal-title">OK om te verwijderen?</h3>
+                                </div>
+                                <div class="modal-body">
+                                    <p>Bevestig verwijderen van organizatie <strong>{{ org_label }}</strong>!</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <a href="{{ url_for('main.organization_delete', org_id=org_id) }}" class="btn btn-danger" role="button">
+                                        Verwijderen
+                                    </a>
+                                    <a href="{{ url_for('main.race_list', org_id=org_id) }}" class="btn btn-warning" role="button">
+                                        Annuleer
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                {% endif %}
+                <a href="{{ url_for('main.race_add', org_id=org_id) }}" class="btn btn-default">
+                    Wedstrijd toevoegen
+                </a>
             </div>
-            {% else %}
-            </div>
-            <br>Organizatie verwijderen is enkel mogelijk als er geen wedstrijden bij de organizatie horen.<br>
-            {% endif %}
-        {% endif %}
-</div>
+        </div>
+    {% endif %}
 {% endblock %}
