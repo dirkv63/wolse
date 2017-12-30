@@ -1,8 +1,9 @@
 {% extends "layout.html" %}
 
 {% block page_content %}
-<div class="row">
-    <h3>{{ cat }} - Overzicht</h3>
+<div class="row overview">
+    <div class="col-lg-12">
+    <h1>{{ cat }} - Overzicht</h1>
     <table class="table table-hover table-bordered">
         <tr>
             <th rowspan="2">Plaats</th>
@@ -29,10 +30,9 @@
             {% endfor %}
         </tr>
 
-        {% set cnt = 1 %}
         {% for row in result_set %}
         <tr>
-            <td>{{ cnt }}</td>
+            <td>{{ loop.index }}</td>
             <td>{% if row[2] > 6 %}<b>{% endif %}
                 <a href="{{ url_for('main.results', cat=cat, person_id=row[3]) }}">
                     {{ row[0] }}
@@ -61,8 +61,8 @@
                 {% endif %}
             {% endfor %}
         </tr>
-        {% set cnt = cnt + 1 %}
         {% endfor %}
     </table>
+    </div>
 </div>
 {% endblock %}

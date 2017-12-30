@@ -15,3 +15,4 @@ a:visited 		{ color: #800080; }
 .error          { background: #f0d6d6; padding: 0.5em; }
 .logo           { padding: 25px 5px 25px 5px; background-color: #FFFFFF}
 .actions        { padding: 20px; background-color: #33CAFF }
+.overview       { display: inline-block; overflow-x: scroll; overflow-y: scroll;}

@@ -502,9 +502,11 @@ class Organization:
         """
         This method searches for the organization based on organization name, location and datestamp. If found,
         then organization attributes will be set using method set_organization. If not found, 'False' will be returned.
-        @param org_dict: New set of properties for the node. These properties are: name, location, datestamp and
+
+        :param org_dict: New set of properties for the node. These properties are: name, location, datestamp and
          org_type
-        @return: True if organization is found, False otherwise.
+
+        :return: True if organization is found, False otherwise.
         """
         org_id = ns.get_organization(**org_dict)
         if org_id:
@@ -519,9 +521,11 @@ class Organization:
         This method will check if the organization is registered already. If not, the organization graph object
         (exists of organization name with link to date and city where it is organized) will be created.
         The organization instance attributes will be set.
-        @param org_dict: New set of properties for the node. These properties are: name, location, datestamp and
+
+        :param org_dict: New set of properties for the node. These properties are: name, location, datestamp and
          org_type. Datestamp needs to be of the form 'YYYY-MM-DD'. org_type 1 for Wedstrijd, 2 for deelname.
-        @return: True if the organization has been registered, False if it existed already.
+
+        :return: True if the organization has been registered, False if it existed already.
         """
         org_type = org_dict["org_type"]
         del org_dict["org_type"]
@@ -532,7 +536,6 @@ class Organization:
         else:
             # Organization on Location and datestamp does not yet exist, register the node.
             self.org_node = ns.create_node("Organization", name=self.org["name"])
-            # graph.create(self.org_node)  # Node will be created on first Relation creation.
             # Organization node known, now I can link it with the Location.
             self.set_location(self.org["location"])
             # Set Date  for Organization
@@ -553,9 +556,11 @@ class Organization:
         date nodes and location nodes if required. The Organization delete function will force to remove an organization
         node without a need to find the date and location first. Therefore the delete function requires a more generic
         date and location removal, where a check on all orphans is done.
-        @param properties: New set of properties for the node. These properties are: name, location, datestamp and
+
+        :param properties: New set of properties for the node. These properties are: name, location, datestamp and
          org_type. Datestamp must be of the form 'YYYY-MM-DD'
-        @return: True if the organization has been updated, False if the organization (name, location, date) existed
+
+        :return: True if the organization has been updated, False if the organization (name, location, date) existed
          already. A change in Organization Type only is also a successful (True) change.
         """
         # Check Organization Type
@@ -643,12 +648,15 @@ class Organization:
     def get_location(self):
         """
         This method will return the location for the Organization.
-        @return: Location name (city name), or False if no location found.
+        @return: Location dictionary containing nid and city, or False if no location found.
         """
         loc_id = ns.get_end_node(self.org_id, "In")
         loc_node = ns.node(loc_id)
-        city = loc_node["city"]
-        return city
+        loc = dict(
+            nid=loc_node["nid"],
+            city=loc_node["city"]
+        )
+        return loc
 
     def get_date(self):
         """
@@ -698,25 +706,16 @@ class Organization:
         else:
             return False
 
-    def ask_for_hoofdwedstrijd(self):
-        """
-        This method will check if adding a race needs an option to select a 'Hoofdwedstrijd'. This is required if
-        Organization Type is 'Wedstrijd' (1) and no hoofdwedstrijd has been selected.
-        @return: True - if Hoofdwedstrijd option for race is required, False otherwise.
-        """
-        if self.get_org_type() == 1 and not self.has_wedstrijd_type("Hoofdwedstrijd"):
-            return True
-        else:
-            return False
-
     def set_location(self, loc=None):
         """
         This method will create a relation between the organization and the location. Relation type is 'In'.
         Organization Node must be available for this method.
-        @param loc: Name of the city.
-        @return:
+
+        :param loc: city name of the location.
+
+        :return: Nothing - relation between organization and location is established.
         """
-        loc_node = Location(loc).get_node()   # Get Location Node
+        loc_node = Location(loc).get_node()   # Get Location Node based on city
         ns.create_relation(from_node=self.org_node, to_node=loc_node, rel="In")
         return
 
@@ -928,7 +927,13 @@ class Race:
 
 
 class Location:
+
     def __init__(self, loc):
+        """
+        The class will initialize the location object based on city name.
+
+        :param loc: city name for the Location.
+        """
         self.loc = loc
 
     def find(self):
@@ -953,7 +958,8 @@ class Location:
         """
         This method will get the node that is associated with the location. If the node does not exist already, it will
         be created.
-        @return:
+
+        :return:
         """
         self.add()    # Register if required, ignore else
         node = self.find()
@@ -1206,9 +1212,37 @@ def get_category_list():
     """
     This method will return the category list in sequence Young to Old. Category items are returned in list of tuples
     with nid and category name
-    :return:
+
+    :return: List of tuples containing nid and category name.
     """
     return [(catn["nid"], catn["name"]) for catn in ns.get_category_nodes()]
+
+
+def get_location(nid):
+    """
+    This method will get a location nid and return the city name. This is because the Location class requires city name
+    as creator attribute.
+
+    :param nid: nid of the location node, returned by a selection field.
+
+    :return: city name of the location node.
+    """
+    loc = ns.get_node("Location", nid=nid)
+    if loc:
+        return loc["city"]
+    else:
+        logging.fatal("Location expected but not found for nid {nid}".format(nid=nid))
+        return False
+
+
+def get_location_list():
+    """
+    This method will return the location list in sequence. Location items are returned in list of tuples
+    with nid and city name
+
+    :return: List of tuples containing nid and city.
+    """
+    return [(locn["nid"], locn["city"]) for locn in ns.get_location_nodes()]
 
 
 def points_position(pos):

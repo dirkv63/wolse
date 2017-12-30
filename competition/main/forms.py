@@ -1,7 +1,14 @@
 from flask_wtf import FlaskForm as Form
-from wtforms import StringField, SubmitField, PasswordField, BooleanField, SelectField, RadioField
+from wtforms import StringField, SubmitField, PasswordField, BooleanField, SelectField, RadioField, HiddenField
+from wtforms import SelectMultipleField
 from wtforms.fields.html5 import DateField
 import wtforms.validators as wtv
+
+
+class LocationAdd(Form):
+    location = StringField('Stad/Gemeente: ', validators=[wtv.required(), wtv.Length(max=24)])
+    ref = HiddenField()
+    submit = SubmitField('OK')
 
 
 class PersonAdd(Form):
@@ -14,7 +21,7 @@ class PersonAdd(Form):
 
 class OrganizationAdd(Form):
     name = StringField('Naam', validators=[wtv.InputRequired(), wtv.Length(1, 24)])
-    location = StringField('Plaats', validators=[wtv.InputRequired(), wtv.Length(1, 24)])
+    location = SelectField('Locatie: ', coerce=str)
     datestamp = DateField('Datum')
     org_type = RadioField(choices=[(1, 'Wedstrijd'), (2, 'Deelname')], default=1, coerce=int,
                           validators=[wtv.InputRequired()])
@@ -22,9 +29,12 @@ class OrganizationAdd(Form):
 
 
 class RaceAdd(Form):
-    name = StringField('Naam', validators=[wtv.InputRequired(), wtv.Length(1, 12)])
-    # raceType = SelectField('Type Wedstrijd', coerce=int)
-    raceType = BooleanField('Hoofdwedstrijd')
+    label = StringField('Label', validators=[wtv.InputRequired(), wtv.Length(1, 12)])
+    mf = RadioField(choices=[('man', 'jongens/heren'), ('vrouw', 'meisjes/dames')], default='man',
+                    validators=[wtv.InputRequired()])
+    category = SelectMultipleField('Categorie: ', coerce=str)
+    cross = BooleanField('Korte Cross')
+    race_type = BooleanField('Punten voor Deelname')
     submit = SubmitField('OK')
 
 

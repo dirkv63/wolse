@@ -3,8 +3,8 @@
 
 {% block page_content %}
 <div class="row">
-    <div class="col-md-5">
-        <h3>{{ cat }} - Stand</h3>
+    <div class="col-lg-5">
+        <h1>{{ cat }} - Stand</h1>
         <table class="table table-hover">
             <tr>
                 <th>Plaats</th>
@@ -30,7 +30,10 @@
         </table>
     </div>
 {% if races is defined %}
-    {{ macros.person_races(person, races) }}
+    <div class="col-lg-7">
+        <h1>{{ person['label'] }}</h1>
+        {{ macros.person_races(person, races) }}
+    </div>
 {% endif %}
 </div>
 {% endblock %}

@@ -14,3 +14,17 @@
         </div>
     </div>
 {% endblock %}
+
+{% block sidebar %}
+    {% if current_user.is_authenticated %}
+        <div class="actions">
+            <h3>Acties</h3>
+            <hr>
+            <div class="btn-group-vertical" role="group" aria-label="Actions">
+                <a href="{{ url_for('main.location_add') }}" class="btn btn-default">
+                    Locatie toevoegen
+                </a>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

@@ -3,7 +3,7 @@ import competition.models_graph as mg
 # import datetime
 from lib import my_env
 # from lib import neostore
-from flask import render_template, flash, current_app, redirect, url_for, request, make_response
+from flask import render_template, flash, current_app, redirect, url_for, request
 from flask_login import login_required, login_user, logout_user
 from .forms import *
 from . import main
@@ -42,6 +42,26 @@ def index():
 def logout():
     logout_user()
     return redirect(url_for('main.index'))
+
+
+@main.route('/location/add', methods=['GET', 'POST'])
+@login_required
+def location_add():
+    form = LocationAdd()
+    if request.method == "GET":
+        form.ref.data = request.referrer
+        return render_template('login.html', form=form)
+    else:
+        if form.validate_on_submit():
+            loc = form.location.data
+            ref = form.ref.data
+            if mg.Location(loc).add():
+                flash("{l} toegevoegd als locatie".format(l=loc), "success")
+            else:
+                flash("{l} bestaaat reeds".format(l=loc), "warning")
+        else:
+            flash("Form did not validate on submit, how did this happen?", "error")
+        return redirect(ref or url_for('main.index'))
 
 
 @main.route('/person/add', methods=['GET', 'POST'])
@@ -161,25 +181,26 @@ def organization_list():
 def organization_add(org_id=None):
     if request.method == "POST":
         form = OrganizationAdd()
-        if form.validate_on_submit():
-            org_dict = dict(name=form.name.data,
-                            location=form.location.data,
-                            datestamp=form.datestamp.data,
-                            org_type=form.org_type.data)
-            if org_id:
-                org = mg.Organization(org_id=org_id)
-                if org.edit(**org_dict):
-                    flash(org_dict["name"] + ' aangepast.', "success")
-                else:
-                    flash(org_dict["name"] + ' bestaat reeds.', "warning")
+        # if form.validate_on_submit(): Form Validate doesn't work on SelectField with choices not defined.
+        city = mg.get_location(form.location.data)
+        org_dict = dict(name=form.name.data,
+                        location=city,
+                        datestamp=form.datestamp.data,
+                        org_type=form.org_type.data)
+        if org_id:
+            org = mg.Organization(org_id=org_id)
+            if org.edit(**org_dict):
+                flash(org_dict["name"] + ' aangepast.', "success")
             else:
-                current_app.logger.debug("Ready to add organization")
-                if mg.Organization().add(**org_dict):
-                    flash(org_dict["name"] + ' toegevoegd als organizatie', "success")
-                else:
-                    flash(org_dict["name"] + ' bestaat reeds, niet toegevoegd.', "warning")
-            # Form validated successfully, clear fields!
-            return redirect(url_for('main.organization_list'))
+                flash(org_dict["name"] + ' bestaat reeds.', "warning")
+        else:
+            current_app.logger.debug("Ready to add organization")
+            if mg.Organization().add(**org_dict):
+                flash(org_dict["name"] + ' toegevoegd als organizatie', "success")
+            else:
+                flash(org_dict["name"] + ' bestaat reeds, niet toegevoegd.', "warning")
+        # Form validated successfully, clear fields!
+        return redirect(url_for('main.organization_list'))
     # Request Method is GET or Form did not validate
     # Note that in case Form did not validate, the fields will be reset.
     # But how can we fail on form_validate?
@@ -188,7 +209,7 @@ def organization_add(org_id=None):
         current_app.logger.debug("Get Form to edit organization")
         org = mg.Organization(org_id=org_id)
         name = org.name
-        location = org.get_location()
+        location = org.get_location()["nid"]
         datestamp = org.get_date()
         org_type = org.get_org_type()
         form = OrganizationAdd(org_type=org_type)
@@ -202,6 +223,7 @@ def organization_add(org_id=None):
         datestamp = None
         form = OrganizationAdd()
     # Form did not validate successfully, keep fields.
+    form.location.choices = mg.get_location_list()
     return render_template('organization_add.html', form=form, name=name, location=location,
                            datestamp=datestamp, organizations=organizations)
 
@@ -251,47 +273,50 @@ def race_list(org_id):
     org.set(org_id)
     org_label = org.get_label()
     races = mg.race_list(org_id)
-    if org.ask_for_hoofdwedstrijd():
-        set_hoofdwedstrijd = "Yes"
-    else:
-        set_hoofdwedstrijd = "No"
     if len(races):
         remove_org = "No"
     else:
         remove_org = "Yes"
     return render_template('/organization_races.html', org_label=org_label, org_id=org_id, races=races,
-                           set_hoofdwedstrijd=set_hoofdwedstrijd, remove_org=remove_org)
+                           remove_org=remove_org)
 
 
 @main.route('/race/<org_id>/add', methods=['GET', 'POST'])
 @login_required
 def race_add(org_id, race_id=None):
-    # name = None
+    """
+    This method allows to add or edit a race.
+
+    :param org_id: nid of the organization to which the race is added.
+
+    :param race_id:  nid of the race if edit is required.
+
+    :return:
+    """
     form = RaceAdd()
     org = mg.Organization(org_id=org_id)
     org_label = org.get_label()
-    if not org.ask_for_hoofdwedstrijd():
-        del form.raceType
     if request.method == "POST":
-        if form.validate_on_submit():
-            current_app.logger.debug("Post Race org: {org_id}, race: {race_id}".format(org_id=org_id, race_id=race_id))
-            name = form.name.data
-            if form.raceType:
-                racetype = form.raceType.data
+        # if form.validate_on_submit(): - validate_on_submit doesn't work with Select List.
+        # For select-multiple, check https://stackoverflow.com/questions/40566757/how-to-get-multiple-selected-items-from-form-in-flask
+        current_app.logger.debug("Post Race org: {org_id}, race: {race_id}".format(org_id=org_id, race_id=race_id))
+        name = form.name.data
+        if form.raceType:
+            racetype = form.raceType.data
+        else:
+            racetype = False
+        if race_id:
+            if mg.Race(race_id=race_id).edit(name):
+                flash(name + ' modified as a Race in Organization', "success")
             else:
-                racetype = False
-            if race_id:
-                if mg.Race(race_id=race_id).edit(name):
-                    flash(name + ' modified as a Race in Organization', "success")
-                else:
-                    flash(name + ' does exist already, not created.', "warning")
+                flash(name + ' does exist already, not created.', "warning")
+        else:
+            if mg.Race(org_id).add(name, racetype):
+                flash(name + ' created as a Race in Organization', "success")
             else:
-                if mg.Race(org_id).add(name, racetype):
-                    flash(name + ' created as a Race in Organization', "success")
-                else:
-                    flash(name + ' does exist already, not created.', "warning")
-            # Form validated successfully, clear fields!
-            return redirect(url_for('main.race_list', org_id=org_id))
+                flash(name + ' does exist already, not created.', "warning")
+        # Form validated successfully, clear fields!
+        return redirect(url_for('main.race_list', org_id=org_id))
     else:
         # Get Form.
         current_app.logger.debug("Get Race org: {org_id}, race: {race_id}".format(org_id=org_id, race_id=race_id))
@@ -299,6 +324,7 @@ def race_add(org_id, race_id=None):
         if race_id:
             form.name.data = mg.Race(race_id=race_id).get_name()
             label = 'aanpassen van'
+        form.category.choices = mg.get_category_list()
         return render_template('race_add.html', form=form, org_id=org_id, org_label=org_label, label=label)
 
 
@@ -327,8 +353,11 @@ def race_delete(race_id):
 def race_edit(org_id, race_id):
     """
     This method will edit an existing race.
+
     :param org_id: The Node ID of the organization.
+
     :param race_id: The Node ID of the race.
+
     :return:
     """
     return race_add(org_id=org_id, race_id=race_id)
@@ -464,36 +493,6 @@ def participant_remove(race_id, pers_id):
     part = mg.Participant(race_id=race_id, pers_id=pers_id)
     part.remove()
     return redirect(url_for('main.participant_add', race_id=race_id))
-
-
-@main.route('/hoofdwedstrijd/remove/<org_id>/<race_id>', methods=['GET', 'POST'])
-@login_required
-def hoofdwedstrijd_remove(org_id, race_id):
-    """
-    This method will change 'Hoofdwedstrijd' to 'Bijwedstrijd'.
-    :param org_id: Node ID of the organization
-    :param race_id: Node ID of the race.
-    :return: True if racetype has been reset from 'Hoofdwedstrijd' to 'Bijwedstrijd'.
-    """
-    bij_node = mg.get_race_type_node("Bijwedstrijd")
-    mg.set_race_type(race_id=race_id, race_type_node=bij_node)
-    mg.points_for_race(race_id)
-    return redirect(url_for('main.race_list', org_id=org_id))
-
-
-@main.route('/hoofdwedstrijd/set/<org_id>/<race_id>', methods=['GET', 'POST'])
-@login_required
-def hoofdwedstrijd_set(org_id, race_id):
-    """
-    This method will change 'Hoofdwedstrijd' to 'Bijwedstrijd'.
-    :param org_id: Node ID of the organization
-    :param race_id: Node ID of the race.
-    :return: True if racetype has been reset from 'Hoofdwedstrijd' to 'Bijwedstrijd'.
-    """
-    hoofd_node = mg.get_race_type_node("Hoofdwedstrijd")
-    mg.set_race_type(race_id=race_id, race_type_node=hoofd_node)
-    mg.points_for_race(race_id)
-    return redirect(url_for('main.race_list', org_id=org_id))
 
 
 @main.route('/result/<cat>', methods=['GET'])
