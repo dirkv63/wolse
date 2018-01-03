@@ -7,6 +7,7 @@ import os
 import sys
 import uuid
 from datetime import datetime, date
+from flask import current_app
 from pandas import DataFrame
 from py2neo import Graph, Node, Relationship, NodeSelector
 from py2neo.database import DBMS
@@ -67,7 +68,8 @@ class NeoStore:
         """
         This method will check if there are orphan locations. These are locations without relations. These locations
         can be removed.
-        @return:
+
+        :return:
         """
         # Note that you could DETACH DELETE location nodes here, but then you miss the opportunity to log what is
         # removed.
@@ -85,11 +87,15 @@ class NeoStore:
         Function to create node. The function will return the node object.
         Note that a 'nid' attribute will be added to the node. This is a UUID4 unique identifier. This is a temporary
         solution cause there seems to be no other way to extract the node ID from a node.
+
         :param labels: Labels for the node
+
         :param props: Value dictionary with values for the node.
+
         :return: Node that has been created.
         """
         props['nid'] = str(uuid.uuid4())
+        current_app.logger.warning("Trying to create node with params {p}".format(p=props))
         component = Node(*labels, **props)
         self.graph.create(component)
         return component
@@ -217,6 +223,53 @@ class NeoStore:
         else:
             logging.error("Non-existing start node ID: {start_node_id}".format(start_node_id=start_node_id))
             return False
+
+    def get_endnode(self, start_node=None, rel_type=None):
+        """
+        This method will calculate the end node from an start Node and a relation type. If relation type is not
+        specified then any relation type will do.
+        The purpose of the function is to find a single end node. If there are multiple end nodes, then a random one
+        is returned and an error message will be displayed.
+
+        :param start_node: Start node.
+
+        :param rel_type: Relation type
+
+        :return: End Node, or False.
+        """
+        # First get Node from end node ID
+        try:
+            rel = next(item for item in self.graph.match(start_node=start_node, rel_type=rel_type))
+        except StopIteration:
+            logging.warning("No end node found for start node ID: {nid} and relation: {rel}"
+                            .format(nid=start_node["nid"], rel=rel_type))
+            return False
+        else:
+            # Check if there are more elements in the iterator.
+            if len([item for item in self.graph.match(start_node=start_node, rel_type=rel_type)]) > 1:
+                logging.warning("More than one end node found for start node ID {nid} and relation {rel},"
+                                " returning first".format(nid=start_node["nid"], rel=rel_type))
+            end_node = rel.end_node()
+            return end_node
+
+    def get_endnodes(self, start_node=None, rel_type=None):
+        """
+        This method will calculate all end nodes from a start Node and a relation type. If relation type is not
+        specified then any relation type will do.
+        The purpose of the function is to find all end nodes.
+
+        :param start_node: Start node.
+
+        :param rel_type: Relation type
+
+        :return: List with End Nodes, or False.
+        """
+        node_list = [rel.end_node()
+                     for rel in self.graph.match(start_node=start_node, rel_type=rel_type)]
+        # Convert to set to remove duplicates
+        node_set = set(node_list)
+        # Then return the list
+        return list(node_set)
 
     def get_cat4part(self, part_nid):
         """
@@ -554,14 +607,17 @@ class NeoStore:
         This function will get an organization nid and return the Races associated with the Organization.
         The races will be returned as a list of dictionaries with fields race (racename), type (racetype) and nid of the
         race.
-        @param org_id: nid of the Organization.
-        @return: List of dictionaries, or empty list which evaluates to False.
+
+        :param org_id: nid of the Organization.
+
+        :return: List of dictionaries, or empty list which evaluates to False.
         """
+        # Todo: review Query to check if result set can contain nodes instead of fields.
         query = """
-            MATCH (org:Organization)-[:has]->(race:Race)-[:type]->(racetype:RaceType)
+            MATCH (org:Organization)-[:has]->(race:Race)
             WHERE org.nid = '{org_id}'
-            RETURN race.name as race, racetype.name as type, race.nid as race_id
-            ORDER BY racetype.weight, race.name
+            RETURN race.racename as racename, race.nid as race_id
+            ORDER BY race.racename
         """.format(org_id=org_id)
         res = self.graph.run(query).data()
         return res
@@ -614,10 +670,14 @@ class NeoStore:
         specified then any relation type will do.
         The purpose of the function is to find a single start node. If there are multiple start nodes, then a random
         one is returned and an error message will be displayed.
-        @param end_node_id: Node nid of the end node.
-        @param rel_type: Relation type
-        @return: Node nid of the start Node, or False.
+
+        :param end_node_id: Node nid of the end node.
+
+        :param rel_type: Relation type
+
+        :return: Node nid of the start Node, or False.
         """
+        # Todo: try to phase out this method in favour of get_startnode, a method that works on nodes instead of IDs.
         # First get Node from end node ID
         end_node = self.node(end_node_id)
         if end_node:
@@ -638,15 +698,45 @@ class NeoStore:
             logging.error("Non-existing end node ID: {end_node_id}".format(end_node_id=end_node_id))
             return False
 
+    def get_startnode(self, end_node=None, rel_type=None):
+        """
+        This method will calculate the start node from an end Node and a relation type. If relation type is not
+        specified then any relation type will do.
+        The purpose of the function is to find a single start node. If there are multiple start nodes, then a random
+        one is returned and an error message will be displayed.
+
+        :param end_node: End node.
+
+        :param rel_type: Relation type
+
+        :return: Start Node, or False.
+        """
+        try:
+            rel = next(item for item in self.graph.match(end_node=end_node, rel_type=rel_type))
+        except StopIteration:
+            logging.warning("No start node found for end node ID {nid} and relation {rel}"
+                            .format(nid=end_node["nid"], rel=rel_type))
+            return False
+        else:
+            # Check if there are more elements in the iterator.
+            if len([item for item in self.graph.match(end_node=end_node, rel_type=rel_type)]) > 1:
+                logging.warning("More than one start node found for end node ID {nid} and relation {rel},"
+                                " returning first".format(nid=end_node["nid"], rel=rel_type))
+            return rel.start_node()
+
     def get_start_nodes(self, end_node_id=None, rel_type=None):
         """
         This method will calculate all start nodes from an end Node ID and a relation type. If relation type is not
         specified then any relation type will do.
         The purpose of the function is to find all start nodes.
-        @param end_node_id: Node nid of the end node.
-        @param rel_type: Relation type
-        @return: List with Node IDs (integers) of the start Node, or False.
+
+        :param end_node_id: Node nid of the end node.
+
+        :param rel_type: Relation type
+
+        :return: List with Node IDs (integers) of the start Node, or False.
         """
+        # Todo: try to phase out this method in favour of get_startnode, a method that works on nodes instead of IDs.
         # First get Node from end node ID
         end_node = self.node(end_node_id)
         if end_node:
@@ -656,6 +746,29 @@ class NeoStore:
             return node_list
         else:
             logging.error("Non-existing end node ID: {end_node_id}".format(end_node_id=end_node_id))
+            return False
+
+    def get_startnodes(self, end_node=None, rel_type=None):
+        """
+        This method will calculate all start nodes from an end Node and a relation type. If relation type is not
+        specified then any relation type will do.
+        The purpose of the function is to find all start nodes.
+
+        :param end_node: The end node.
+
+        :param rel_type: Relation type
+
+        :return: List with start nodes, or False.
+        """
+        if isinstance(end_node, Node):
+            node_list = [rel.start_node()
+                         for rel in self.graph.match(end_node=end_node, rel_type=rel_type)]
+            # Convert to set to remove duplicates
+            node_set = set(node_list)
+            # Then return the list
+            return list(node_set)
+        else:
+            logging.error("Attribute not type Node (instead type {t})".format(t=type(end_node)))
             return False
 
     def get_wedstrijd_type(self, org_id, racetype):
@@ -723,10 +836,13 @@ class NeoStore:
         """
         This method will get a node ID and return a node, (or false in case no Node can be associated with the ID.
         The current release of py2neo 3.1.2 throws a IndexError in case a none-existing node ID is requested.)
+
         Note that since there seems to be no way to extract the Node ID of a node, the nid attribute is used. As a
         consequence, it is not possible to use the node(nid).
-        @param nid: ID of the node to be found.
-        @return: Node, or False (None) in case the node could not be found.
+
+        :param nid: ID of the node to be found.
+
+        :return: Node, or False (None) in case the node could not be found.
         """
         selected = self.selector.select(nid=nid)
         node = selected.first()
@@ -740,15 +856,15 @@ class NeoStore:
         removed.
         For now each node has an attribute nid which contains a random node ID.
 
-        @param node_obj: Node object
-        @return: ID of the node (integer), or False.
+        :param node_obj: Node object
+
+        :return: ID of the node (integer), or False.
         """
         # First check if my object is a node (not sure it is a node, but I am sure it is a sub-graph)
-        try:
-            self.graph.exists(node_obj)
-            # OK, my object is a node (or a relation?). Now return the nid attribute
+        if isinstance(node_obj, Node):
+            # OK, my object is a node. Now return the nid attribute
             return node_obj['nid']
-        except TypeError:
+        else:
             logging.error("Node expected, but got object of type {nodetype}".format(nodetype=type(node_obj)))
             return False
 
@@ -805,14 +921,14 @@ class NeoStore:
 
         :param properties: Dictionary of the property set for the node. 'nid' property is mandatory.
 
-        :return: True if successful update, False otherwise.
+        :return: Updated node if successful, False otherwise.
         """
         try:
             my_node = self.node(properties["nid"])
         except KeyError:
             logging.error("Attribute 'nid' missing, required in dictionary.")
             return False
-        if my_node:
+        if isinstance(my_node, Node):
             curr_props = self.node_props(properties["nid"])
             # Remove properties
             remove_props = [prop for prop in curr_props if prop not in properties]
@@ -825,7 +941,7 @@ class NeoStore:
                 my_node[prop] = properties[prop]
             # Now push the changes to Neo4J database.
             self.graph.push(my_node)
-            return True
+            return my_node
         else:
             logging.error("No node found for NID {nid}".format(nid=properties["nid"]))
             return False
@@ -870,8 +986,10 @@ class NeoStore:
         """
         This method will remove node with ID node_id. The node and the relations to/from the node will also be deleted.
         Use 'remove_node' to remove nodes only when there should be no relations attached to it.
-        @param nid: nid of the node
-        @return: True if node is deleted, False otherwise
+
+        :param nid: nid of the node
+
+        :return: True if node is deleted, False otherwise
         """
         query = "MATCH (n) WHERE n.nid='{nid}' DETACH DELETE n".format(nid=nid)
         self.graph.run(query)
@@ -881,10 +999,14 @@ class NeoStore:
         """
         This method will remove the relation rel_type between Node with nid start_nid and Node with nid end_nid.
         Relation is of type rel_type.
-        @param start_nid: Node nid of the start node.
-        @param end_nid: Node nid of the end node.
-        @param rel_type: Type of the relation
-        @return:
+
+        :param start_nid: Node nid of the start node.
+
+        :param end_nid: Node nid of the end node.
+
+        :param rel_type: Type of the relation
+
+        :return:
         """
         query = """
             MATCH (start_node)-[rel_type:{rel_type}]->(end_node)

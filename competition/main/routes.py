@@ -47,6 +47,7 @@ def logout():
 @main.route('/location/add', methods=['GET', 'POST'])
 @login_required
 def location_add():
+    ref = False
     form = LocationAdd()
     if request.method == "GET":
         form.ref.data = request.referrer
@@ -79,21 +80,15 @@ def person_add(person_id=None):
             else:
                 form = PersonAdd(mf=mf)
             form.name.data = name
-            # if 'born' in person_dict:
-            #     bornstr = person_dict['born']
-            #     form.born.data = my_env.datestr2date(bornstr)
         else:
             name = None
             form = PersonAdd()
     else:
         # request.method == "POST":
         form = PersonAdd()
-        name = None
         # if form.validate_on_submit(): Doesn't work with SelectField
         person_dict = dict(name=form.name.data)
         person_mf = form.mf.data
-        # if form.born.data:
-        #     person_dict['born'] = form.born.data.strftime('%Y-%m-%d')
         name = person_dict['name']
         if person_id:
             # This is from person edit function
@@ -147,7 +142,7 @@ def person_summary(pers_id):
     # Don't count on len(races), since this is competition races. Remove person only if not used across all
     # competitions.
     persons = mg.person_list(nr_races=True)
-    return render_template('/person_races_list.html', person=person_dict, races=races, persons=persons)
+    return render_template('person_races_list.html', person=person_dict, races=races, persons=persons)
 
 
 @main.route('/person/<pers_id>/delete')
@@ -194,7 +189,7 @@ def organization_add(org_id=None):
             else:
                 flash(org_dict["name"] + ' bestaat reeds.', "warning")
         else:
-            current_app.logger.debug("Ready to add organization")
+            current_app.logger.debug("Ready to add organization with values {v}".format(v=org_dict))
             if mg.Organization().add(**org_dict):
                 flash(org_dict["name"] + ' toegevoegd als organizatie', "success")
             else:
@@ -233,7 +228,9 @@ def organization_add(org_id=None):
 def organization_edit(org_id):
     """
     This method will edit an existing organization.
+
     :param org_id: The Node ID of the organization.
+
     :return:
     """
     # current_app.logger.debug("Evaluate Organization/edit")
@@ -247,7 +244,7 @@ def organization_delete(org_id):
     This method will delete an existing organization. This can be done only if there are no races attached to the
     organization.
     :param org_id: The Node ID of the organization.
-    :return: True if the orgnaization is removed, False otherwise.
+    :return: True if the organization is removed, False otherwise.
     """
     # Todo: Check on Organization Date, does this needs to be removed?
     # Todo: Check on Organization Location, does this needs to be removed?
@@ -265,27 +262,20 @@ def race_list(org_id):
     """
     This method will manage races with an organization. It will get the organization object based on ID. Then it will
     show the list of existing races for the organization. Races need to be added, removed or modified.
+
     :param org_id: Organization ID
+
     :return:
     """
-    current_app.logger.debug("org_id: " + org_id)
-    org = mg.Organization()
-    org.set(org_id)
-    org_label = org.get_label()
-    races = mg.race_list(org_id)
-    if len(races):
-        remove_org = "No"
-    else:
-        remove_org = "Yes"
-    return render_template('/organization_races.html', org_label=org_label, org_id=org_id, races=races,
-                           remove_org=remove_org)
+    race_list_attribs = mg.get_race_list_attribs(org_id)
+    return render_template('organization_races.html', **race_list_attribs)
 
 
 @main.route('/race/<org_id>/add', methods=['GET', 'POST'])
 @login_required
 def race_add(org_id, race_id=None):
     """
-    This method allows to add or edit a race.
+    This method allows to add or edit a race. Race name is optional. Category/MF makes label.
 
     :param org_id: nid of the organization to which the race is added.
 
@@ -294,38 +284,34 @@ def race_add(org_id, race_id=None):
     :return:
     """
     form = RaceAdd()
-    org = mg.Organization(org_id=org_id)
-    org_label = org.get_label()
     if request.method == "POST":
         # if form.validate_on_submit(): - validate_on_submit doesn't work with Select List.
-        # For select-multiple, check https://stackoverflow.com/questions/40566757/how-to-get-multiple-selected-items-from-form-in-flask
-        current_app.logger.debug("Post Race org: {org_id}, race: {race_id}".format(org_id=org_id, race_id=race_id))
-        name = form.name.data
-        if form.raceType:
-            racetype = form.raceType.data
-        else:
-            racetype = False
+        params = dict(
+            name=form.name.data,
+            categories=form.category.data,
+            mf=form.mf.data,
+            short=form.cross.data
+        )
         if race_id:
-            if mg.Race(race_id=race_id).edit(name):
-                flash(name + ' modified as a Race in Organization', "success")
-            else:
-                flash(name + ' does exist already, not created.', "warning")
+            racename = mg.Race(race_id=race_id).edit(**params)
+            flash("Race {rl} modified in Organization".format(rl=racename), "success")
         else:
-            if mg.Race(org_id).add(name, racetype):
-                flash(name + ' created as a Race in Organization', "success")
-            else:
-                flash(name + ' does exist already, not created.', "warning")
+            racename = mg.Race(org_id).add(**params)
+            flash("Race {rl} created in Organization".format(rl=racename), "success")
         # Form validated successfully, clear fields!
         return redirect(url_for('main.race_list', org_id=org_id))
     else:
         # Get Form.
-        current_app.logger.debug("Get Race org: {org_id}, race: {race_id}".format(org_id=org_id, race_id=race_id))
-        label = 'toevoegen aan'
-        if race_id:
-            form.name.data = mg.Race(race_id=race_id).get_name()
-            label = 'aanpassen van'
         form.category.choices = mg.get_category_list()
-        return render_template('race_add.html', form=form, org_id=org_id, org_label=org_label, label=label)
+        if race_id:
+            race = mg.Race(race_id=race_id)
+            form.name.data = race.get_name()
+            form.cross.data = race.is_short()
+            form.category.data = race.get_cat_nids()
+            form.mf.data = race.get_mf_value()
+        race_add_attribs = mg.get_race_list_attribs(org_id)
+        race_add_attribs['form'] = form
+        return render_template('organization_races.html', **race_add_attribs)
 
 
 @main.route('/race/delete/<race_id>', methods=['GET', 'POST'])
@@ -334,7 +320,9 @@ def race_delete(race_id):
     """
     This method will delete an existing race. This can be done only if there are no participants attached to the
     race.
+
     :param race_id: The Node ID of the race.
+
     :return: True if the race is removed, False otherwise.
     """
     current_app.logger.debug("Delete race {race_id}".format(race_id=race_id))
@@ -370,9 +358,10 @@ def participant_list(race_id):
     :param race_id:
     :return:
     """
+    race = mg.Race(race_id=race_id)
     param_dict = dict(
-        race_label=mg.race_label(race_id),
-        org_id=mg.get_org_id(race_id=race_id),
+        race_label=race.get_label(),
+        org_id=race.get_org_id(),
         race_id=race_id
     )
     finishers = mg.participant_seq_list(race_id)

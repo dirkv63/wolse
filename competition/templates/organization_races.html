@@ -1,40 +1,19 @@
 {% extends "layout.html" %}
+{% import "bootstrap/wtf.html" as wtf %}
+{% import "macros.html" as macros %}
+
 {% block page_content %}
-    <h2>{{ org_label }}</h2>
-    <table class="table table-hover">
-        <tr>
-            <th>Wedstrijden</th>
-            <th>Type</th>
-        </tr>
-        {% for row in races %}
-        <tr>
-            <td>
-                <a href="{{ url_for('main.participant_list', race_id=row.race_id, org_id=org_id) }}">
-                    {{ row.race}}
-                </a>
-            </td>
-            <td>
-                {% if current_user.is_authenticated %}
-                    {% if row.type is equalto "Hoofdwedstrijd" %}
-                        <a href="{{ url_for('main.hoofdwedstrijd_remove', race_id=row.race_id, org_id=org_id) }}">
-                    {% endif %}
-                    {% if set_hoofdwedstrijd is equalto "Yes" %}
-                        <a href="{{ url_for('main.hoofdwedstrijd_set', race_id=row.race_id, org_id=org_id) }}">
-                    {% endif %}
-                {% endif %}
-                    {{ row.type }}
-                {% if current_user.is_authenticated %}
-                    {% if row.type is equalto "Hoofdwedstrijd" %}
-                        </a>
-                    {% endif %}
-                    {% if set_hoofdwedstrijd is equalto "Yes" %}
-                        </a>
-                    {% endif %}
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
+    <div class="row">
+        <h1>{{ org_label }}</h1>
+        <div class="col-md-7">
+            {{ macros.org_races(races, org_id) }}
+        </div>
+        {% if form is defined %}
+            <div class="col-md-5">
+                {{ wtf.quick_form(form) }}
+            </div>
+        {% endif %}
+    </div>
 {% endblock %}
 
 {% block sidebar %}

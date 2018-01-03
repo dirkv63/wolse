@@ -23,18 +23,16 @@ class OrganizationAdd(Form):
     name = StringField('Naam', validators=[wtv.InputRequired(), wtv.Length(1, 24)])
     location = SelectField('Locatie: ', coerce=str)
     datestamp = DateField('Datum')
-    org_type = RadioField(choices=[(1, 'Wedstrijd'), (2, 'Deelname')], default=1, coerce=int,
-                          validators=[wtv.InputRequired()])
+    org_type = BooleanField('Punten voor Deelname')
     submit = SubmitField('OK')
 
 
 class RaceAdd(Form):
-    label = StringField('Label', validators=[wtv.InputRequired(), wtv.Length(1, 12)])
+    name = StringField('Naam', validators=[wtv.Optional(), wtv.Length(1, 12)])
     mf = RadioField(choices=[('man', 'jongens/heren'), ('vrouw', 'meisjes/dames')], default='man',
                     validators=[wtv.InputRequired()])
     category = SelectMultipleField('Categorie: ', coerce=str)
     cross = BooleanField('Korte Cross')
-    race_type = BooleanField('Punten voor Deelname')
     submit = SubmitField('OK')
 
 
