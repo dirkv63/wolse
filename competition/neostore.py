@@ -37,13 +37,10 @@ class NeoStore:
     def connect2db(**neo4j_params):
         """
         Internal method to create a database connection. This method is called during object initialization.
-        @return: Database handle and cursor for the database.
-        neo4j_params = {
-            'user': "neo4j",
-            'password': "6H0sehEpbOkI",
-            'db': "winter17.db"
-        }
+
+        :return: Database handle and cursor for the database.
         """
+        print("Trying to connect with params: {n}".format(n=neo4j_params))
         neo4j_config = {
             'user': neo4j_params['user'],
             'password': neo4j_params["password"],
@@ -79,7 +76,7 @@ class NeoStore:
         res = self.graph.run(query).data()
         for locs in res:
             logging.info("Remove location {city} with nid {loc_nid}".format(city=locs['city'], loc_nid=locs['loc_nid']))
-            self.remove_node(locs['loc_nid'])
+            self.remove_node2br(locs['loc_nid'])
         return
 
     def create_node(self, *labels, **props):
@@ -454,28 +451,6 @@ class NeoStore:
                                   date=org_dict["datestamp"]))
             return False
 
-    def get_organization_from_id(self, org_id):
-        """
-        This method will get an organization ID and search for the organization details.
-        @param org_id: nid of the organization Node.
-        @return: Dictionary with organization details: date, day, month, year, org (organization label) and city
-        """
-        query = """
-            MATCH (date:Day)<-[:On]-(org:Organization)-[:In]->(loc:Location)
-            WHERE org.nid = '{org_id}'
-            RETURN date.day as day, date.month as month, date.year as year, date.key as date,
-                   org.name as org, loc.city as city
-        """.format(org_id=org_id)
-        org_array = DataFrame(self.graph.run(query).data())
-        df_length = org_array.index
-        if len(df_length) == 0:
-            logging.error("No organization found for nid {nid}".format(nid=org_id))
-            return False
-        elif len(org_array) > 1:
-            logging.error("Multiple organizations found for nid {nid}, using first one.".format(nid=org_id))
-        org_row = org_array.iloc[0].to_dict()
-        return org_row
-
     def get_organization_list(self):
         """
         This method will get a list of all organizations. Each item in the list is a dictionary with fields date,
@@ -795,7 +770,8 @@ class NeoStore:
         """
         This method will initialize the graph. It will set indices and create nodes required for the application
         (on condition that the nodes do not exist already).
-        @return:
+
+        :return:
         """
         stmt = "CREATE CONSTRAINT ON (n:{0}) ASSERT n.{1} IS UNIQUE"
         self.graph.run(stmt.format('Location', 'city'))
@@ -961,7 +937,28 @@ class NeoStore:
         else:
             return False
 
-    def remove_node(self, nid):
+    def remove_node(self, node):
+        """
+        This method will remove the node on condition that no relations are attached to the node.
+
+        :param node: Node to be removed.
+
+        :return: True if node is deleted, False otherwise
+        """
+        if isinstance(node, Node):
+            if self.graph.degree(node) == 0:
+                self.graph.delete(node)
+                return True
+            else:
+                msg = "Request to delete node nid {node_id}, but {x} relations found. Node not deleted"\
+                    .format(node_id=node["nid"], x=self.graph.degree(node))
+                current_app.logger.warning(msg)
+                return False
+        else:
+            current_app.logger.error("Node expected, but got type {t}".format(t=type(node)))
+            return False
+
+    def remove_node2br(self, nid):
         """
         This method will remove node with ID node_id. Nodes can be removed only if there are no relations attached to
         the node.
@@ -970,6 +967,7 @@ class NeoStore:
 
         :return: True if node is deleted, False otherwise
         """
+        # Todo: This method needs to be replaced by remove_node, which accepts a node (instead of a nid) as argument.
         obj_node = self.node(nid)
         if not obj_node:
             return False
@@ -985,7 +983,7 @@ class NeoStore:
     def remove_node_force(self, nid):
         """
         This method will remove node with ID node_id. The node and the relations to/from the node will also be deleted.
-        Use 'remove_node' to remove nodes only when there should be no relations attached to it.
+        Use 'remove_node2br' to remove nodes only when there should be no relations attached to it.
 
         :param nid: nid of the node
 
@@ -1008,6 +1006,7 @@ class NeoStore:
 
         :return:
         """
+        # Todo: this method needs to be replaced by remove_relation_node.
         query = """
             MATCH (start_node)-[rel_type:{rel_type}]->(end_node)
             WHERE start_node.nid='{start_nid}'
@@ -1015,6 +1014,23 @@ class NeoStore:
             DELETE rel_type
         """.format(rel_type=rel_type, start_nid=start_nid, end_nid=end_nid)
         self.graph.run(query)
+        return
+
+    def remove_relation_node(self, start_node=None, end_node=None, rel_type=None):
+        """
+        This method will remove the relation rel_type between start_node and end_node where relation is type rel_type.
+
+        :param start_node:
+
+        :param end_node:
+
+        :param rel_type:
+
+        :return:
+        """
+        # Todo: rename the method to remove_relation.
+        rel = Relationship(start_node, rel_type, end_node)
+        self.graph.separate(rel)
         return
 
     def set_node_nid(self, node_id):

@@ -90,7 +90,7 @@ class TestModelGraph(unittest.TestCase):
         self.assertTrue((isinstance(person_node[1], str)))
 
     # def test_organization_delete(self):
-    #   This test is done in test_models_graph_classes.py
+    #   This test is done in test_models_graph_classes_legacy.py
 
     def test_participant_after_list(self):
         # This is the participant_seq_list, with an object [-1, "Eerste Aankomst"] prepended

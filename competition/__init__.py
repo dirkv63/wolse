@@ -31,6 +31,7 @@ def create_app(config_name):
     bootstrap.init_app(app)
     lm.init_app(app)
 
+    print("Set Neo4J Environment")
     os.environ['Neo4J_User'] = app.config.get('NEO4J_USER')
     os.environ['Neo4J_Pwd'] = app.config.get('NEO4J_PWD')
     os.environ['Neo4J_Db'] = app.config.get('NEO4J_DB')

@@ -23,7 +23,10 @@ racelabel = "Race"
 # Define Relation Types
 catgroup2cat = "memberOf"
 inCategory = "inCategory"
+org2date = "On"
+org2loc = "In"
 org2race = "has"
+org2type = "type"
 race2category = "forCategory"
 race2mf = "forMF"
 
@@ -504,16 +507,17 @@ class Person:
 class Organization:
     """
     This class instantiates to an organization.
-    @return: Object
+    If an organization ID is provided, then the corresponding organization object is created. Otherwise an empty
+    organization object is created.
+
+    The organization object has the organization node as its property.
+
+    :return: Object
     """
     def __init__(self, org_id=None):
-        self.name = 'NotYetDefined'
-        self.org_id = -1
         self.org_node = None
-        self.label = "NotYetDefined"
-        self.org = None
         if org_id:
-            self.set(org_id)
+            self.org_node = self.get_node(org_id)
 
     def add(self, **org_dict):
         """
@@ -528,6 +532,7 @@ class Organization:
 
         :return: True if the organization has been registered, False if it existed already.
         """
+        # Create the Organization node.
         self.org_node = ns.create_node("Organization", name=org_dict["name"])
         # Organization node known, now I can link it with the Location.
         self.set_location(org_dict["location"])
@@ -538,8 +543,6 @@ class Organization:
             self.set_org_type("Deelname")
         else:
             self.set_org_type("Wedstrijd")
-        # Set organization parameters by finding the created organization
-        self.set(self.org_node["nid"])
         return True
 
     def edit(self, **properties):
@@ -563,103 +566,73 @@ class Organization:
             org_type = "Wedstrijd"
         if self.set_org_type(org_type):
             # Organization type changed, so re-calculate points for all races in the organization
-            racelist = race_list(self.org_id)
+            racelist = race_list(self.org_node["nid"])
             for rec in racelist:
                 # Probably not efficient, but then you should't change organization type too often.
                 points_for_race(rec["race_id"])
-        del properties["org_type"]
-        # Check if name, date or location are changed
-        changed_keys = [key for key in sorted(properties) if not (properties[key] == self.org[key])]
-        if len(changed_keys) > 0:
-            # Something is changed, update the organization graph.
-            if 'name' in changed_keys:
-                node_prop = dict(
-                    name=properties["name"],
-                    nid=self.org_id
-                )
-                ns.node_update(**node_prop)
-            if 'location' in changed_keys:
-                # Remember current location - before fiddling around with relations!
-                curr_loc = Location(self.org["location"]).get_node()
-                curr_loc_id = ns.node_id(curr_loc)
-                # First create link to new location
-                self.set_location(properties["location"])
-                # Then remove link to current location
-                ns.remove_relation(start_nid=self.org_id, end_nid=curr_loc_id, rel_type="In")
-                # Finally check if current location is still required. Remove if there are no more links.
-                ns.remove_node(curr_loc_id)
-            if 'datestamp' in changed_keys:
-                # Get Node for current day
-                curr_ds = self.org["datestamp"]
-                curr_date_node = ns.date_node(curr_ds)
-                # First create link to new date
-                self.set_date(properties["datestamp"])
-                # Then remove link from current date
-                ns.remove_relation(start_nid=self.org_id, end_nid=ns.node_id(curr_date_node), rel_type="On")
-                # Finally check if date (day, month, year) can be removed.
-                # Don't remove single date, clear all dates that can be removed. This avoids the handling of key
-                # because date nodes don't have a nid.
-                ns.clear_date()
-            # New attributes configured, now set Organization again.
-            self.set(self.org_id)
-        return True
-
-    def set(self, org_id):
-        """
-        This method will get the organization associated with this ID. The assumption is that the org_id relates to a
-        existing and valid organization.
-        It will set the organization labels.
-
-        :param org_id:
-
-        :return:
-        """
-        this_org = ns.get_organization_from_id(org_id)
-        self.label = "{org_name} ({city}, {day:02d}-{month:02d}-{year})".format(org_name=this_org["org"],
-                                                                                city=this_org["city"],
-                                                                                day=this_org["day"],
-                                                                                month=this_org["month"],
-                                                                                year=this_org["year"])
-        self.org = dict(
-            name=this_org["org"],
-            location=this_org["city"],
-            datestamp=this_org["date"]
-        )
-        self.name = this_org["org"]
-        self.org_id = org_id
-        self.org_node = ns.node(org_id)
+        # Check Organization name.
+        if properties['name'] != self.get_name():
+            node_prop = dict(
+                name=properties["name"],
+                nid=self.org_node["nid"]
+            )
+            ns.node_update(**node_prop)
+        # Check location
+        curr_loc_node = self.get_location()
+        if properties['location'] != curr_loc_node['city']:
+            # Remember current location - before fiddling around with relations!
+            # First create link to new location
+            self.set_location(properties["location"])
+            # Then remove link to current location
+            ns.remove_relation_node(start_node=self.org_node, rel_type=org2loc, end_node=curr_loc_node)
+            # Finally check if current location is still required. Remove if there are no more links.
+            ns.remove_node(curr_loc_node)
+        # Check Date
+        curr_ds_node = self.get_date()
+        if properties["datestamp"] != curr_ds_node["key"]:
+            # First create link to new date
+            self.set_date(properties["datestamp"])
+            # Then remove link from current date
+            ns.remove_relation_node(start_node=self.org_node, end_node=curr_ds_node, rel_type=org2date)
+            # Finally check if date (day, month, year) can be removed.
+            # Don't remove single date, clear all dates that can be removed. This avoids the handling of key
+            # because date nodes don't have a nid.
+            ns.clear_date()
         return True
 
     def get_label(self):
         """
         This method will return the label of the Organization. (Organization name, city and date). Assumption is that
         the organization has been set already.
-        @return:
+        :return:
         """
-        return self.label
+        org_name = self.org_node["name"]
+        city = self.get_location()["city"]
+        ds = self.get_date()
+        label = "{org_name} ({city}, {day:02d}-{month:02d}-{year})".format(org_name=org_name,
+                                                                           city=city,
+                                                                           day=ds["day"],
+                                                                           month=ds["month"],
+                                                                           year=ds["year"])
+        return label
 
     def get_location(self):
         """
         This method will return the location for the Organization.
-        @return: Location dictionary containing nid and city, or False if no location found.
+
+        :return: Location node.
         """
-        loc_id = ns.get_end_node(self.org_id, "In")
-        loc_node = ns.node(loc_id)
-        loc = dict(
-            nid=loc_node["nid"],
-            city=loc_node["city"]
-        )
-        return loc
+        loc_node = ns.get_endnode(self.org_node, org2loc)
+        return loc_node
 
     def get_date(self):
         """
-        This method will return the date for the Organization.
-        @return: Date, Format YYYY-MM-DD
+        This method will return the date node for the Organization.
+
+        :return: Date node
         """
-        date_id = ns.get_end_node(self.org_id, "On")
-        date_node = ns.node(date_id)
-        datestamp = date_node["key"]
-        return datestamp
+        date_node = ns.get_endnode(start_node=self.org_node, rel_type=org2date)
+        return date_node
 
     def get_name(self):
         """
@@ -674,19 +647,20 @@ class Organization:
         This method will return the nid of the Organization node.
         :return: nid of the Organization node
         """
-        return self.org_id
+        return self.org_node["nid"]
 
-    def get_org_node(self):
+    def get_node(self, org_id=None):
         """
-        This method returns the Organization Node.
+        This method returns the Organization Node, or sets the organization node if org_id is provided.
 
-        :return: Organization node, or False if Organization node not yet defined.
+        :param org_id: NID of the organization. Optional. If not specified, then the node will be returned. If set, then
+        the organization node is set.
+
+        :return: Organization node.
         """
-        if isinstance(self.org_node, Node):
-            return self.org_node
-        else:
-            current_app.logger.error("Organization node not defined, check code!")
-            return False
+        if org_id:
+            self.org_node = ns.node(org_id)
+        return self.org_node
 
     def get_org_type(self):
         """
@@ -701,18 +675,16 @@ class Organization:
             # org_type not yet defined for organization.
             return False
 
-    def has_wedstrijd_type(self, racetype="NotFound"):
+    def set_date(self, ds=None):
         """
-        This method will check the number of races of type racetype. It can be used to check if there is a
-        'Hoofdwedstrijd' assigned with the Organization.
-        @param racetype: Race Type (Hoofdwedstrijd, Bijwedstrijd, Deelname)
-        @return: Number of races for this type, False if there are no races.
+        This method will create a relation between the organization and the date. Relation type is 'On'.
+        Organization Node must be available for this method.
+        @param ds: Datestamp
+        @return:
         """
-        res = ns.get_wedstrijd_type(self.org_id, racetype)
-        if res:
-            return res
-        else:
-            return False
+        date_node = ns.date_node(ds)   # Get Date (day) node
+        ns.create_relation(from_node=self.org_node, rel=org2date, to_node=date_node)
+        return
 
     def set_location(self, loc=None):
         """
@@ -724,18 +696,7 @@ class Organization:
         :return: Nothing - relation between organization and location is established.
         """
         loc_node = Location(loc).get_node()   # Get Location Node based on city
-        ns.create_relation(from_node=self.org_node, to_node=loc_node, rel="In")
-        return
-
-    def set_date(self, ds=None):
-        """
-        This method will create a relation between the organization and the date. Relation type is 'On'.
-        Organization Node must be available for this method.
-        @param ds: Datestamp
-        @return:
-        """
-        date_node = ns.date_node(ds)   # Get Date (day) node
-        ns.create_relation(from_node=self.org_node, rel="On", to_node=date_node)
+        ns.create_relation(from_node=self.org_node, to_node=loc_node, rel=org2loc)
         return
 
     def set_org_type(self, org_type):
@@ -748,18 +709,18 @@ class Organization:
 
         :return: True if org_type is set (or changed), False if org_type is not changed.
         """
-        # Todo: Add link to recalculate points in the races.
+        # Todo: Add link to recalculate points in the races (this link is in org edit!)
         if self.get_org_type():
             if self.get_org_type == org_type:
                 # All set, return
                 return False
             else:
                 # Org Type needs to change, remove here.
-                org_type_id = ns.get_end_node(self.org_id, "type")
-                ns.remove_relation(self.org_id, org_type_id, "type")
+                org_type_node = ns.get_endnode(start_node=self.org_node, rel_type=org2type)
+                ns.remove_relation_node(start_node=self.org_node, rel_type=org2type, end_node=org_type_node)
         # Set the organization type
         org_type_node = get_org_type_node(org_type)
-        ns.create_relation(from_node=self.org_node, rel="type", to_node=org_type_node)
+        ns.create_relation(from_node=self.org_node, rel=org2type, to_node=org_type_node)
         return True
 
 
@@ -808,7 +769,7 @@ class Race:
         # Create Race Node with attribute name and label
         self.race_node = ns.create_node(racelabel, **race_props)
         # Add Race Node to Organization
-        ns.create_relation(from_node=self.org.get_org_node(), rel=org2race, to_node=self.race_node)
+        ns.create_relation(from_node=self.org.get_node(), rel=org2race, to_node=self.race_node)
         # Create link between race node and each category - this should also work for empty category list?
         if isinstance(categorie_nodes, list):
             for categorie_node in categorie_nodes:
@@ -1114,10 +1075,10 @@ def get_race_list_attribs(org_id):
 
     :return: Parameters for the Race List macro: org_id, org_label, races (race_list) and remove_org flag.
     """
-    org = Organization()
-    org.set(org_id)
+    org = Organization(org_id=org_id)
+    # org.set(org_id)
     races = race_list(org_id)
-    if len(races):
+    if len(races) > 0:
         remove_org = "No"
     else:
         remove_org = "Yes"
@@ -1375,6 +1336,16 @@ def get_mf_node(prop):
     """
     props = dict(name=prop)
     return ns.get_node("MF", **props)
+
+
+def get_ns():
+    """
+    This method will return the Neostore Connection object. Neostore connection is created here, and as part of
+    application creation. So it is available for anyone (including test modules) who want to use it.
+
+    :return:
+    """
+    return ns
 
 
 def points_position(pos):
@@ -1676,7 +1647,7 @@ def remove_node(node_id):
     @param node_id:
     @return: True if node is deleted, False otherwise
     """
-    return ns.remove_node(node_id)
+    return ns.remove_node2br(node_id)
 
 
 def remove_node_force(node_id):

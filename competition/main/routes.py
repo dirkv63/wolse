@@ -203,9 +203,9 @@ def organization_add(org_id=None):
     if org_id:
         current_app.logger.debug("Get Form to edit organization")
         org = mg.Organization(org_id=org_id)
-        name = org.name
+        name = org.get_name()
         location = org.get_location()["nid"]
-        datestamp = org.get_date()
+        datestamp = org.get_date()["key"]
         org_type = org.get_org_type()
         form = OrganizationAdd(org_type=org_type)
         form.name.data = name
