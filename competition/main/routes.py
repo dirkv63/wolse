@@ -71,42 +71,36 @@ def person_add(person_id=None):
     if request.method == "GET":
         if person_id:
             person = mg.Person(person_id=person_id)
-            person_dict = person.props()
-            name = person_dict['name']
-            mf = person.get_mf()
+            mf = person.get_mf_value()
             if person.get_category():
                 cat_nid = person.get_category()["nid"]
                 form = PersonAdd(mf=mf, category=cat_nid)
             else:
                 form = PersonAdd(mf=mf)
-            form.name.data = name
+            form.name.data = person.get_name()
         else:
-            name = None
             form = PersonAdd()
+        form.category.choices = mg.get_category_list()
+        persons = mg.person_list(nr_races=True)
+        return render_template('person_add.html', form=form, persons=persons)
     else:
         # request.method == "POST":
         form = PersonAdd()
         # if form.validate_on_submit(): Doesn't work with SelectField
-        person_dict = dict(name=form.name.data)
-        person_mf = form.mf.data
-        name = person_dict['name']
+        person_dict = dict(
+            name=form.name.data,
+            mf=form.mf.data,
+            category=form.category.data
+        )
         if person_id:
             # This is from person edit function
-            current_app.logger.debug("Person Dictionary: {person_dict}".format(person_dict=person_dict))
+            # current_app.logger.debug("Person Dictionary: {person_dict}".format(person_dict=person_dict))
             person = mg.Person(person_id=person_id)
             person.edit(**person_dict)
-            person.set_mf(person_mf)
         else:
             person = mg.Person()
-            if person.add(**person_dict):
-                person.set_mf(person_mf)
-            else:
-                flash(name + ' bestaat reeds, niet toegevoegd.', "warning")
-        person.set_category(form.category.data)
+            person.add(**person_dict)
         return redirect(url_for('main.person_add'))
-    form.category.choices = mg.get_category_list()
-    persons = mg.person_list(nr_races=True)
-    return render_template('person_add.html', form=form, name=name, persons=persons)
 
 
 @main.route('/person/edit/<pers_id>', methods=['GET', 'POST'])
@@ -154,9 +148,7 @@ def person_delete(pers_id):
     :param pers_id:
     :return:
     """
-    person = mg.Person()
-    person.set(pers_id)
-    # part_name = part.get_name()
+    person = mg.Person(pers_id)
     if person.active():
         current_app.logger.warning("Request to delete id {pers_id} but person participates in races"
                                    .format(pers_id=pers_id))
@@ -302,6 +294,7 @@ def race_add(org_id, race_id=None):
         return redirect(url_for('main.race_list', org_id=org_id))
     else:
         # Get Form.
+        race_add_attribs = mg.get_race_list_attribs(org_id)
         form.category.choices = mg.get_category_list()
         if race_id:
             race = mg.Race(race_id=race_id)
@@ -309,7 +302,7 @@ def race_add(org_id, race_id=None):
             form.cross.data = race.is_short()
             form.category.data = race.get_cat_nids()
             form.mf.data = race.get_mf_value()
-        race_add_attribs = mg.get_race_list_attribs(org_id)
+            race_add_attribs["racename"] = race.get_racename()
         race_add_attribs['form'] = form
         return render_template('organization_races.html', **race_add_attribs)
 

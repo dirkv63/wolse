@@ -22,18 +22,23 @@ racelabel = "Race"
 
 # Define Relation Types
 catgroup2cat = "memberOf"
-inCategory = "inCategory"
 org2date = "On"
 org2loc = "In"
 org2race = "has"
 org2type = "type"
+person2category = "inCategory"
+person2mf = "mf"
+person2participant = "is"
 race2category = "forCategory"
 race2mf = "forMF"
 
+# mf_tx translates from man/vrouw (form value to Node name).
 mf_tx = dict(
     man="Heren",
     vrouw="Dames"
 )
+# mf_tx_inf translates from Node name to man/vrouw value.
+mf_tx_inv = {y: x for x, y in mf_tx.items()}
 
 
 class User(UserMixin):
@@ -325,82 +330,85 @@ class Participant:
 
 
 class Person:
+    """
+    A person is uniquely identified by the name. A person must have link to mf and to one category. The person object
+    always has the person node.
+    """
     # Todo: add a person.remove() method: remove MF link, check no participant links available.
+    # Todo: add voornaam/familienaam
 
     def __init__(self, person_id=None):
         if person_id:
-            self.person_id, self.name = self.set(person_id)
+            self.person_node = self.get_node(person_id)
         else:
-            self.name = 'NotYetDefined'
-            self.person_id = person_id
+            self.person_node = None
 
-    def find(self):
+    @staticmethod
+    def find(name):
         """
         Find ID of the person with name 'name'. Return node ID, else return false.
         This function must be called from add(), so make it an internal function?
-        @return: Node ID, or false if no node could be found.
+
+        :param name: Name of the person.
+
+        :return: True if found (Person Node will be set in the object), or false if no node could be found.
         """
         props = {
-            "name": self.name
+            "name": name
         }
         person_node = ns.get_node("Person", **props)
-        if person_node:
-            self.person_id = person_node["nid"]
+        if isinstance(person_node, Node):
             return True
         else:
             return False
 
-    def add(self, **properties):
+    def add(self, **props):
         """
         Attempt to add the participant with name 'name'. The name must be unique. Person object is set to current
         participant. Name is set in this procedure, ID is set in the find procedure.
 
-        :param properties: Properties (in dict) for the person
+        :param props: Properties (in dict) for the person. Name, mf and category are mandatory.
 
         :return: True, if registered. False otherwise.
         """
-        self.name = properties['name']
-        if self.find():
-            # Person is found, Name and ID set, no need to register.
+        if self.find(props["name"]):
+            # Person is found, Node set, do not create object.
             return False
         else:
             # Person not found, register participant.
-            ns.create_node("Person", **properties)
-            # Now call find() again to set ID for the person
-            self.find()
+            person_props = dict(
+                name=props["name"]
+            )
+            self.person_node = ns.create_node("Person", **person_props)
+            # Link to MF
+            link_mf(props["mf"], self.person_node, person2mf)
+            self.set_category(props["category"])
             return True
 
-    def edit(self, **properties):
+    def edit(self, **props):
         """
         This method will update an existing person node. A check is done to guarantee that the name is not duplicated
         to an existing name on another node. Modified properties will be updated and removed properties will be deleted.
 
-        :param properties: New set of properties for the node
+        :param props: New set of properties (name, mf (boolean) and category(nid)) for the node
 
         :return: True - in case node is rewritten successfully.
         """
-        logging.fatal("Look here, properties: {p}".format(p=properties))
-        properties["nid"] = self.person_id
-        ns.node_update(**properties)
+        # Name change?
+        cn = self.get_name()
+        if props["name"] != cn:
+            if self.find(props["name"]):
+                current_app.logger.error("Change name {cn} to new name {nn}, but this exists already!"
+                                         .format(cn=cn, nn=props["name"]))
+                return False
+            else:
+                self.set_name(props["name"])
+        link_mf(props["mf"], self.person_node, person2mf)
+        self.set_category(props["category"])
         return True
 
-    def set(self, person_id):
-        """
-        This method will set the person associated with this ID. The assumption is that the person_id relates to a
-        existing and valid person.
-        @param person_id:
-        @return: Person object is set to the participant.
-        """
-        person_node = ns.node(person_id)
-        if person_node:
-            self.name = person_node["name"]
-            self.person_id = person_id
-            return self.person_id, self.name
-        else:
-            raise ValueError("NodeNotFound")
-
-    def get(self):
-        return self.name
+    def get_name(self):
+        return self.person_node["name"]
 
     def get_dict(self):
         """
@@ -411,33 +419,42 @@ class Person:
         False: inactive user, can be removed).
         """
         person_dict = dict(
-            nid=self.person_id,
-            label=self.get(),
+            nid=self.person_node["nid"],
+            label=self.get_name(),
             active=self.active()
         )
         return person_dict
 
-    def get_mf(self):
+    def get_mf_value(self):
         """
-        This method will get 'MF' link for the person, and translates the value to 'man' or 'vrouw'.
-        :return: 'man', 'vrouw' or 'False' in case 'MF' is not set.
+        This method will get mf value to set race in web form.
+
+        :return: mf value (man/vrouw)
         """
-        mf_node_id = ns.get_end_node(start_node_id=self.person_id, rel_type="mf")
-        if mf_node_id:
-            mf_node = ns.node(mf_node_id)
-            return mf_tx[mf_node["name"]]
-        else:
-            return False
+        return get_mf_value(node=self.person_node, rel=person2mf)
+
+
+    def get_node(self, person_id=None):
+        """
+        This method returns the Person Node, or sets the person node if person_id is provided.
+
+        :param person_id: NID of the person. Optional. If not specified, then the node will be returned. If set, then
+        the person node is set.
+
+        :return: Person node.
+        """
+        if person_id:
+            self.person_node = ns.node(person_id)
+        return self.person_node
 
     def get_category(self):
         """
         This method will get the category node for the person.
 
-        :return:
+        :return: Category Node, or False if person not set to category.
         """
-        cat_node_id = ns.get_end_node(start_node_id=self.person_id, rel_type=inCategory)
-        if cat_node_id:
-            cat_node = ns.node(cat_node_id)
+        cat_node = ns.get_endnode(start_node=self.person_node, rel_type=person2category)
+        if isinstance(cat_node, Node):
             return cat_node
         else:
             return False
@@ -446,49 +463,43 @@ class Person:
         """
         This method will check if a person is active. For now, this means that a person has 'participates' links.
         If the person is not active, then the person can be removed.
-        @return: True if the person is active, False otherwise
-        """
-        return ns.get_end_nodes(start_node_id=self.person_id, rel_type="is")
 
-    def props(self):
+        :return: True if the person is active, False otherwise
         """
-        This method will return the properties for the node in a dictionary format.
-        @return:
-        """
-        return ns.node_props(nid=self.person_id)
+        end_node_list = ns.get_endnodes(start_node=self.person_node, rel_type=person2participant)
+        if len(end_node_list) == 0:
+            # Empty list, so person does not participate in any race.
+            return False
+        else:
+            return True
 
-    def set_mf(self, mf_label):
+    def set_name(self, name):
         """
-        This method will set 'MF' link for the person. It will check if a link exists already. If not, then link
-        will be created. If link exists, but invalid link then required link will be created and invalid link will
-        be removed.
+        This method will update a person name to a new name.
 
-        :param mf_label: Label to set (man/vrouw)
+        :param name:
 
         :return:
         """
-        current_mf = self.get_mf()
-        if current_mf:
-            if current_mf == mf_label:
-                # OK, required link exists already. Return
-                return False
-            else:
-                # The opposite link exists. Remove it.
-                props = dict(name=mf_tx[current_mf])
-                mf_node = ns.get_node("MF", **props)
-                ns.remove_relation(start_nid=self.person_id, end_nid=mf_node["nid"], rel_type="mf")
-        # On this point I'm sure no relation exists
-        person_node = ns.node(self.person_id)
-        mf_node = get_mf_node(mf_label)
-        ns.create_relation(from_node=person_node, rel="mf", to_node=mf_node)
-        return True
+        cn = self.get_name()
+        if self.find(name):
+            current_app.logger.error("Change name {cn} to new name {nn}, but this exists already!"
+                                     .format(cn=cn, nn=name))
+            return False
+        else:
+            props = ns.node_props(self.person_node["nid"])
+            props["name"] = name
+            ns.node_update(**props)
+            return True
 
     def set_category(self, cat_nid):
         """
         This method will set the person in the Category specified by the cat_nid. The assumption is that cat_nid is the
         nid of a category.
-        In case the person is already assigned to the category, nothing will be done.
+        In case the person is already assigned to this category, nothing will be done.
+
         :param cat_nid:
+
         :return: True
         """
         current_cat_node = self.get_category()
@@ -498,9 +509,10 @@ class Person:
                 return
             else:
                 # Change category for person by removing Category first
-                ns.remove_relation(start_nid=self.person_id, end_nid=current_cat_node["nid"], rel_type=inCategory)
+                ns.remove_relation_node(start_node=self.person_node, end_node=current_cat_node, rel_type=person2category)
         # No category for person (anymore), add person to category
-        ns.create_relation(from_node=ns.node(self.person_id), to_node=ns.node(cat_nid), rel=inCategory)
+        cat_node = ns.node(cat_nid)
+        ns.create_relation(from_node=self.person_node, to_node=cat_node, rel=person2category)
         return True
 
 
@@ -751,19 +763,19 @@ class Race:
             self.race_node = ns.node(nid=race_id)
             self.set_org()
 
-    def add(self, **params):
+    def add(self, **props):
         """
         This method will add the race to this organization. This is done by creating a race graph object, consisting of
         a race node, link to mf and optional links to the categories.
         Note that check on duplicate races is not done. If a duplicate race is defined, then the user will see it in the
         list and can remove it again.
 
-        :param params: Dictionary with race parameters, including name (optional), categorylist (optional), mf and short
+        :param props: Dictionary with race properties, including name (optional), categorylist (optional), mf and short
          (for korte cross). Name or categorylist or short (korte cross) is mandatory.
 
         :return: racename
         """
-        raceconfig = race_config(**params)
+        raceconfig = race_config(**props)
         race_props = raceconfig["race_props"]
         categorie_nodes = raceconfig["category_nodes"]
         # Create Race Node with attribute name and label
@@ -774,20 +786,20 @@ class Race:
         if isinstance(categorie_nodes, list):
             for categorie_node in categorie_nodes:
                 ns.create_relation(from_node=self.race_node, rel=race2category, to_node=categorie_node)
-        self.link_mf(params["mf"])
+        link_mf(mf=props["mf"], node=self.race_node, rel=race2mf)
         return self.race_node["racename"]
 
-    def edit(self, **params):
+    def edit(self, **props):
         """
         This method will update the race.
 
-        :param params: Dictionary with race parameters, including name (optional), categorylist (optional), mf and short
+        :param props: Dictionary with race properties, including name (optional), categorylist (optional), mf and short
          (for korte cross). Name or categorylist or short (korte cross) is mandatory.
 
         :return: racename
         """
         # Update race_node properties
-        raceconfig = race_config(**params)
+        raceconfig = race_config(**props)
         race_props = raceconfig["race_props"]
         race_props["nid"] = self.race_node["nid"]
         self.race_node = ns.node_update(**race_props)
@@ -804,7 +816,7 @@ class Race:
         remove_rels = [node for node in current_cat_nodes if node not in categorie_nodes]
         for end_node in remove_rels:
             ns.remove_relation(start_nid=self.race_node["nid"], end_nid=end_node["nid"], rel_type=race2category)
-        self.link_mf(params["mf"])
+        link_mf(mf=props["mf"], node=self.race_node, rel=race2mf)
         return self.race_node["racename"]
 
     def get_cat_nids(self):
@@ -833,10 +845,7 @@ class Race:
 
         :return: mf value (man/vrouw)
         """
-        mf_node = ns.get_endnode(start_node=self.race_node, rel_type=race2mf)
-        mf = mf_node["name"]
-        mf_tx_inv = {y: x for x, y in mf_tx.items()}
-        return mf_tx_inv[mf]
+        return get_mf_value(node=self.race_node, rel=race2mf)
 
     def get_name(self):
         """
@@ -877,31 +886,6 @@ class Race:
         :return: Type of the race: Wedstrijd or Deelname
         """
         return self.org.get_org_type()
-
-    def link_mf(self, mf):
-        """
-        This method will link the race to current mf. If Link does not exist, it will be created. If link is to other
-        node, the link will be removed and attached to required mf node.
-
-        :param mf: mf attribute from web form.
-
-        :return:
-        """
-        # Translate web property to node name
-        mf_name = mf_tx[mf]
-        # Review MF link - update if different from current setting
-        current_mf = ns.get_endnode(start_node=self.race_node, rel_type=race2mf)
-        if isinstance(current_mf, Node):
-            if current_mf["name"] != mf_name:
-                # Remove link to current node
-                ns.remove_relation(start_nid=self.race_node["nid"], rel_type=race2mf)
-            else:
-                # Link from race to mf exist, all OK!
-                return
-        # Create link between race node and MF.
-        mf_node = get_mf_node(mf_name)
-        ns.create_relation(from_node=self.race_node, rel=race2mf, to_node=mf_node)
-        return
 
     def is_short(self):
         """
@@ -1089,6 +1073,39 @@ def get_race_list_attribs(org_id):
         remove_org=remove_org
     )
     return params
+
+
+def link_mf(mf, node, rel):
+    """
+    This method will link the node to current mf. If Link does not exist, it will be created. If link is to other
+    node, the link will be removed and attached to required mf node.
+
+    :param mf: mf attribute from web form (man/vrouw)
+
+    :param node: Start node for the relation (Person or Race)
+
+    :param rel: relation
+
+    :return:
+    """
+    current_app.logger.info("mf: {mf}, rel: {rel}".format(mf=mf, rel=rel))
+    # Translate web property to node name
+    mf_name = mf_tx[mf]
+    # Review MF link - update if different from current setting
+    current_mf = ns.get_endnode(start_node=node, rel_type=rel)
+    if isinstance(current_mf, Node):
+        if current_mf["name"] != mf_name:
+            # Remove link to current node
+            ns.remove_relation_node(start_node=node, end_node=current_mf, rel_type=rel)
+        else:
+            current_app.logger.info("No changes required...")
+            # Link from race to mf exist, all OK!
+            return
+    # Create link between race node and MF.
+    mf_node = get_mf_node(mf_name)
+    current_app.logger.info("Creating connection to node {mf}".format(mf=mf_node))
+    ns.create_relation(from_node=node, rel=rel, to_node=mf_node)
+    return
 
 
 def race_list(org_id):
@@ -1306,7 +1323,7 @@ def get_location(nid):
 
     :param nid: nid of the location node, returned by a selection field.
 
-    :return: city name of the location node.
+    :return: city name of the location node, or False if no location found.
     """
     loc = ns.get_node("Location", nid=nid)
     if loc:
@@ -1336,6 +1353,21 @@ def get_mf_node(prop):
     """
     props = dict(name=prop)
     return ns.get_node("MF", **props)
+
+
+def get_mf_value(node, rel):
+    """
+    This method will get mf value to set race in web form. The MF Node is on the end of a relation (person or race.)
+
+    :param node: Start Node for the relation (person or race)
+
+    :param rel: Relation type (person2mf or race2mf)
+
+    :return: mf value (man/vrouw)
+    """
+    mf_node = ns.get_endnode(start_node=node, rel_type=rel)
+    mf = mf_node["name"]
+    return mf_tx_inv[mf]
 
 
 def get_ns():
@@ -1639,15 +1671,6 @@ def relations(node_id):
     @return:
     """
     return ns.relations(node_id)
-
-
-def remove_node(node_id):
-    """
-    This function will remove the node with node ID node_id, on condition that there are no more relations to the node.
-    @param node_id:
-    @return: True if node is deleted, False otherwise
-    """
-    return ns.remove_node2br(node_id)
 
 
 def remove_node_force(node_id):

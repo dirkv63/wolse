@@ -10,6 +10,11 @@
         </div>
         {% if form is defined %}
             <div class="col-md-5">
+                {% if racename is defined %}
+                    <h3>{{ racename }}</h3>
+                {% else %}
+                    <h3>Nieuwe wedstrijd</h3>
+                {% endif %}
                 {{ wtf.quick_form(form) }}
             </div>
         {% endif %}

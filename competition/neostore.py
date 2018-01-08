@@ -40,7 +40,6 @@ class NeoStore:
 
         :return: Database handle and cursor for the database.
         """
-        print("Trying to connect with params: {n}".format(n=neo4j_params))
         neo4j_config = {
             'user': neo4j_params['user'],
             'password': neo4j_params["password"],
@@ -53,12 +52,6 @@ class NeoStore:
             logging.fatal("Connected to Neo4J database {d}, but expected to be connected to {n}"
                           .format(d=dbname, n=neo4j_params['db']))
             sys.exit(1)
-        return graph
-
-    @staticmethod
-    def connect2graphene():
-        graphenedb_url = os.environ.get("GRAPHENEDB_URL")
-        graph = Graph(graphenedb_url, bolt=False)
         return graph
 
     def clear_locations(self):
@@ -74,9 +67,9 @@ class NeoStore:
             MATCH (loc:Location) WHERE NOT (loc)--() RETURN loc.nid as loc_nid, loc.city as city
         """
         res = self.graph.run(query).data()
-        for locs in res:
-            logging.info("Remove location {city} with nid {loc_nid}".format(city=locs['city'], loc_nid=locs['loc_nid']))
-            self.remove_node2br(locs['loc_nid'])
+        for loc in res:
+            logging.info("Remove location {city} with nid {loc_nid}".format(city=loc['city'], loc_nid=loc['loc_nid']))
+            self.remove_node(loc)
         return
 
     def create_node(self, *labels, **props):
@@ -259,7 +252,7 @@ class NeoStore:
 
         :param rel_type: Relation type
 
-        :return: List with End Nodes, or False.
+        :return: List with End Nodes.
         """
         node_list = [rel.end_node()
                      for rel in self.graph.match(start_node=start_node, rel_type=rel_type)]
@@ -380,11 +373,11 @@ class NeoStore:
 
         :param props:
 
-        :return: node that fulfills the criteria
+        :return: node that fulfills the criteria, or False if there is no node
         """
         nodes = self.get_nodes(*labels, **props)
         if not nodes:
-            logging.info("Expected 1 node for label {l} and props {p}, found none.".format(l=labels, p=props))
+            current_app.logger.info("Expected 1 node for label {l} and props {p}, found none.".format(l=labels, p=props))
             return False
         elif len(nodes) > 1:
             logging.error("Expected 1 node for label {l} and props {p}, found many {m}."
@@ -394,12 +387,20 @@ class NeoStore:
     def get_nodes(self, *labels, **props):
         """
         This method will select all nodes that have labels and properties
-        @param labels:
-        @param props:
-        @return: list of nodes that fulfill the criteria
+
+        :param labels:
+
+        :param props:
+
+        :return: list of nodes that fulfill the criteria, or False if no nodes are found.
         """
         nodes = self.selector.select(*labels, **props)
-        return list(nodes)
+        nodelist = list(nodes)
+        if len(nodelist) == 0:
+            # No nodes found that fulfil the criteria
+            return False
+        else:
+            return nodelist
 
     def get_nodes_no_nid(self):
         """
@@ -847,8 +848,12 @@ class NeoStore:
     def node_props(self, nid=None):
         """
         This method will get a node and return the node properties in a dictionary.
-        @param nid: nid of the node required
-        @return: Dictionary of the node properties
+        This method can be used to add or modify one property and update the node. The application does not need to know
+        all node attributes, only the attribute that is changed.
+
+        :param nid: nid of the node required
+
+        :return: Dictionary of the node properties
         """
         my_node = self.node(nid)
         if my_node:
@@ -1019,6 +1024,7 @@ class NeoStore:
     def remove_relation_node(self, start_node=None, end_node=None, rel_type=None):
         """
         This method will remove the relation rel_type between start_node and end_node where relation is type rel_type.
+        The goal is to use the
 
         :param start_node:
 
@@ -1030,6 +1036,8 @@ class NeoStore:
         """
         # Todo: rename the method to remove_relation.
         rel = Relationship(start_node, rel_type, end_node)
+        # Do I need to merge first?
+        self.graph.merge(rel)
         self.graph.separate(rel)
         return
 

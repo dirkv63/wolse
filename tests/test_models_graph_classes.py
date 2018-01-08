@@ -3,17 +3,10 @@ This procedure will test the classes of the models_graph.
 """
 
 import unittest
-import os
-from competition import create_app, neostore
-from datetime import date
-
+from competition import create_app
 # Create app before import models_graph. Environment settings for Neo4J are required before import.
 app = create_app('testing')
-
 from competition import models_graph as mg
-
-# Import py2neo to test on class types
-from py2neo import Node
 
 # @unittest.skip("Focus on Coverage")
 class TestModelGraphClass(unittest.TestCase):
