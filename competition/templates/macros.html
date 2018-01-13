@@ -122,13 +122,17 @@
 {% macro person_list(persons) %}
     <table class="table table-hover">
         <tr>
+            <th>Category</th>
+            <th></th>
             <th>Naam</th>
             <th>#</th>
         </tr>
-        {% for row in persons %}
+        {% for person in persons %}
         <tr>
-            <td><a href="{{ url_for('main.person_summary', pers_id=row[0]) }}">{{ row[1] }}</a></td>
-            <td>{{ row[2] }}</td>
+            <td>{{ person['category'] }}</td>
+            <td>{{ person['mf'] }}</td>
+            <td><a href="{{ url_for('main.person_summary', pers_id=person['nid']) }}">{{ person['name'] }}</a></td>
+            <td>{{ person["races"] }}</td>
         </tr>
         {% endfor %}
     </table>

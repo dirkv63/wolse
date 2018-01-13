@@ -81,7 +81,7 @@ def person_add(person_id=None):
         else:
             form = PersonAdd()
         form.category.choices = mg.get_category_list()
-        persons = mg.person_list(nr_races=True)
+        persons = mg.person_list()
         return render_template('person_add.html', form=form, persons=persons)
     else:
         # request.method == "POST":
@@ -118,7 +118,7 @@ def person_edit(pers_id):
 
 @main.route('/person/list')
 def person_list():
-    persons = mg.person_list(nr_races=True)
+    persons = mg.person_list()
     return render_template('person_list.html', persons=persons)
 
 
@@ -135,7 +135,7 @@ def person_summary(pers_id):
     races = mg.races4person(pers_id)
     # Don't count on len(races), since this is competition races. Remove person only if not used across all
     # competitions.
-    persons = mg.person_list(nr_races=True)
+    persons = mg.person_list()
     return render_template('person_races_list.html', person=person_dict, races=races, persons=persons)
 
 
@@ -368,12 +368,15 @@ def participant_list(race_id):
 def participant_add(race_id):
     """
     This method will add a person to a race. The previous runner (earlier arrival) is selected from drop-down list.
-    By default the person is appended as tha last position in the race, so the previous person was the last one in the
+    By default the person is appended as the last position in the race, so the previous person was the last one in the
     race. First position is specified as previous runner equals -1.
+
     :param race_id: ID of the race.
+
     :return: The person is added or modified as a participant to the race.
     """
-    race_label = mg.race_label(race_id)
+    race = mg.Race(race_id=race_id)
+    race_label = race.get_label()
     if request.method == "POST":
         # Call form to get input values
         form = ParticipantAdd()
@@ -392,7 +395,7 @@ def participant_add(race_id):
         return redirect(url_for('main.participant_add', race_id=race_id))
     else:
         # Get method, initialize page.
-        org_id = mg.get_org_id(race_id)
+        org_id = race.get_org_id()
         part_last = mg.participant_last_id(race_id)
         # Initialize Form
         form = ParticipantAdd(prev_runner=part_last)
@@ -424,7 +427,8 @@ def participant_edit(part_id):
     person = mg.Person(person_id=person_nid)
     person_dict = person.get_dict()
     race_id = part.get_race_nid()
-    race_label = mg.race_label(race_id)
+    race = mg.Race(race_id=race_id)
+    race_label = race.get_label()
     if request.method == "POST":
         # Call form to get input values
         form = ParticipantEdit()

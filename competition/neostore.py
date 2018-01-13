@@ -3,7 +3,7 @@ This class consolidates functions related to the neo4J datastore.
 """
 
 import logging
-import os
+# import os
 import sys
 import uuid
 from datetime import datetime, date
@@ -496,8 +496,10 @@ class NeoStore:
     def get_participant_seq_list(self, race_id):
         """
         This method will return a list of participant nodes in sequence of arrival for a particular race.
-        @param race_id:
-        @return: Node list
+
+        :param race_id:
+
+        :return: Node list
         """
         query = """
             MATCH race_ptn = (race)<-[:participates]-(participant),
@@ -556,28 +558,6 @@ class NeoStore:
         else:
             return race_data["race_nid"], race_data["org_name"]
 
-    def get_race_label(self, race_id):
-        """
-        This method will return the dictionary that allows to create the race label.
-        @param race_id: nid of the race.
-        @return: Dictionary with the Race information. Fields: race, org, city, day, month, year.
-        """
-        query = """
-            MATCH (race:Race)<-[:has]-(org)-[:On]->(date),
-                  (org)-[:In]->(loc),
-                  (type:RaceType)<-[:type]-(race)
-            WHERE race.nid='{race_id}'
-            RETURN race.name as race, org.name as org, loc.city as city, date.day as day,
-                   date.month as month, date.year as year, type.name as type
-        """.format(race_id=race_id)
-        recordlist = self.graph.run(query).data()
-        if len(recordlist) == 0:
-            logging.error("Expected to find a Race Label, but no match... ({nid})".format(nid=race_id))
-            return False
-        elif len(recordlist) > 1:
-            logging.error("Found multiple races for Race ID {nid}".format(nid=race_id))
-        return recordlist[0]
-
     def get_race_list(self, org_id):
         """
         This function will get an organization nid and return the Races associated with the Organization.
@@ -586,17 +566,30 @@ class NeoStore:
 
         :param org_id: nid of the Organization.
 
-        :return: List of dictionaries, or empty list which evaluates to False.
+        :return: List of dictionaries with race, category and mf nodes sorted on category and mf, or empty list which
+        evaluates to False.
         """
         # Todo: review Query to check if result set can contain nodes instead of fields.
         query = """
-            MATCH (org:Organization)-[:has]->(race:Race)
+            MATCH (org:Organization)-[:has]->(race:Race),
+                  (race)-[:forCategory]->(category:Category),
+                  (race)-[:forMF]->(mf:MF)
             WHERE org.nid = '{org_id}'
-            RETURN race.racename as racename, race.nid as race_id
-            ORDER BY race.racename
+            RETURN race, category, mf
+            ORDER BY category.seq, mf.name
         """.format(org_id=org_id)
-        res = self.graph.run(query).data()
-        return res
+        res = self.graph.run(query)
+        # Convert result set in an array of nodes
+        res_arr = []
+        while res.forward():
+            rec = res.current()
+            race_nodes = dict(
+                race=rec["race"],
+                category=rec["category"],
+                mf=rec["mf"]
+            )
+            res_arr.append(race_nodes)
+        return res_arr
 
     def get_race4person(self, person_id):
         """

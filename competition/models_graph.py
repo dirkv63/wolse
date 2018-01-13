@@ -425,6 +425,16 @@ class Person:
         )
         return person_dict
 
+
+    def get_mf(self):
+        """
+        This method will get mf node.
+
+        :return: mf node
+        """
+        return ns.get_endnode(start_node=self.person_node, rel_type=person2mf)
+
+
     def get_mf_value(self):
         """
         This method will get mf value to set race in web form.
@@ -472,6 +482,14 @@ class Person:
             return False
         else:
             return True
+
+    def get_races4person(self):
+        """
+        This method will get a dictionary with information about all the races for the person.
+
+        :return: Dictionary with all information about the races for the person
+        """
+        return ns.get_race4person(self.person_node["nid"])
 
     def set_name(self, name):
         """
@@ -1119,25 +1137,9 @@ def race_list(org_id):
     return ns.get_race_list(org_id)
 
 
-def race_label(race_id):
-    """
-    This function will return the label for the Race nid
-
-    :param race_id:
-
-    :return:
-    """
-    # Todo: this method will be removed!
-    record = ns.get_race_label(race_id)
-    label = "{day:02d}-{month:02d}-{year} - {city}, {race} ({d})"\
-        .format(race=record["race"], city=record["city"], d=record["type"],
-                day=record["day"], month=record["month"], year=record["year"])
-    return label
-
-
 def races4person(pers_id):
     """
-    This method is pass-thru for a method in neostore module.
+    This method is pass-through for a method in neostore module.
     This method will get a list of race_ids per person, sorted on date. The information per race will be provided in
     a list of dictionaries. This includes date, organization, type of race, and race results.
 
@@ -1229,24 +1231,35 @@ def race_delete(race_id=None):
         return True
 
 
-def person_list(nr_races=None):
+def person_list():
     """
     Return the list of persons as person objects.
-    @param nr_races: if True then add number of races for the person to the list.
-    @return: List of persons objects. Each person is represented in a list with nid and name of the person.
+
+    :return: List of persons objects. Each person is represented as a dictionary with person nid, name, category,
+    category sequence (cat_seq), mf and number of races. The list is sorted on Category, MF and name.
     """
     res = ns.get_nodes('Person')
     person_arr = []
     for node in res:
-        attribs = [node["nid"], node["name"]]
-        if nr_races:
-            attribs.append(len(ns.get_race4person(person_id=node["nid"])))
-        person_arr.append(attribs)
-    if nr_races:
-        person_arr.sort(key=lambda x: -x[2])
-    else:
-        person_arr.sort(key=lambda x: x[1])
-    return person_arr
+        person = Person(person_id=node["nid"])
+        cat_node = person.get_category()
+        if cat_node:
+            category = cat_node["name"]
+            cat_seq = cat_node["seq"]
+        else:
+            category = "Not defined"
+            cat_seq = 100000
+        person_dict = dict(
+            nid=person.get_node()["nid"],
+            name=person.get_name(),
+            category=category,
+            cat_seq=cat_seq,
+            mf=person.get_mf()["name"],
+            races=len(person.get_races4person())
+        )
+        person_arr.append(person_dict)
+        persons_sorted = sorted(person_arr, key=lambda x: (x["cat_seq"], x["mf"], x["name"]))
+    return persons_sorted
 
 
 def person4participant(part_id):
