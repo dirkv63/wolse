@@ -2,6 +2,7 @@
 This procedure will test the classes of the models_graph.
 """
 
+import datetime
 import unittest
 from competition import create_app
 # Create app before import models_graph. Environment settings for Neo4J are required before import.
@@ -28,7 +29,8 @@ class TestModelGraphClass(unittest.TestCase):
         # This function tests the organization.
         name = "Dwars door Hillesheim"
         city = "Hillesheim_X"
-        ds = "1963-07-02"
+        ds_str = "1963-07-02"
+        ds = datetime.datetime.strptime(ds_str, "%Y-%m-%d")
         org_dict = dict(
             name=name,
             location=city,
@@ -45,7 +47,7 @@ class TestModelGraphClass(unittest.TestCase):
         self.assertEqual(loc["city"], city)
         self.assertTrue(mg.get_location(loc_nid), "Location is available")
         # Test Datestamp
-        self.assertEqual(org.get_date()["key"], ds)
+        self.assertEqual(org.get_date()["key"], ds_str)
         # Test name
         self.assertEqual(org.get_name(), name)
         # Test label
@@ -60,7 +62,8 @@ class TestModelGraphClass(unittest.TestCase):
         # This function tests the organization Edit.
         name = "Dwars door Hillesheim"
         city = "Hillesheim_X"
-        ds = "1963-07-02"
+        ds_str = "1963-07-02"
+        ds = datetime.datetime.strptime(ds_str, "%Y-%m-%d")
         org_dict = dict(
             name=name,
             location=city,
@@ -76,7 +79,8 @@ class TestModelGraphClass(unittest.TestCase):
         # Update organization
         name = "Rondom Berndorf"
         city = "Berndorf-Y"
-        ds = "1964-10-28"
+        ds_str = "1964-10-28"
+        ds = datetime.datetime.strptime(ds_str, "%Y-%m-%d")
         org_dict = dict(
             name=name,
             location=city,
@@ -90,7 +94,7 @@ class TestModelGraphClass(unittest.TestCase):
         self.assertEqual(loc["city"], city)
         self.assertTrue(mg.get_location(loc_nid), "Location is available")
         # Test Datestamp
-        self.assertEqual(org.get_date()["key"], ds)
+        self.assertEqual(org.get_date()["key"], ds_str)
         # Test name
         self.assertEqual(org.get_name(), name)
         # Test label

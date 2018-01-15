@@ -186,16 +186,16 @@ class TestModelGraph(unittest.TestCase):
         # For a valid organization ID I need to get a race list back
         # For an invalide organization ID False needs to be returned
         org_id = "e92399b0-c143-4696-8543-6b10715817b2"
-        races = mg.race_list(org_id)
+        races = mg.get_race_list(org_id)
         self.assertTrue(isinstance(races, list))
         self.assertEqual(len(races), 3)
         # For a new organization ID I want to have a valid empty list
         org_id = "ea83be48-fa39-4f6b-8f57-4952283997b7"
-        races = mg.race_list(org_id)
+        races = mg.get_race_list(org_id)
         self.assertTrue(isinstance(races, list))
         self.assertEqual(len(races), 0)
         org_id = "BestaatNiet"
-        self.assertFalse(mg.race_list(org_id))
+        self.assertFalse(mg.get_race_list(org_id))
 
     def test_racetype_list(self):
         # Check if I get a list of tuples back. Each tuple must be a nid and a racetype name.

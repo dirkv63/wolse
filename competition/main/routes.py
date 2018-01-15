@@ -175,6 +175,7 @@ def organization_add(org_id=None):
                         datestamp=form.datestamp.data,
                         org_type=form.org_type.data)
         if org_id:
+            current_app.logger.debug("Modify organisation with ID {id}".format(id=org_id))
             org = mg.Organization(org_id=org_id)
             if org.edit(**org_dict):
                 flash(org_dict["name"] + ' aangepast.', "success")
@@ -193,13 +194,17 @@ def organization_add(org_id=None):
     # But how can we fail on form_validate?
     organizations = mg.organization_list()
     if org_id:
-        current_app.logger.debug("Get Form to edit organization")
+        current_app.logger.debug("Get Form to edit organization with ID: {id}".format(id=org_id))
         org = mg.Organization(org_id=org_id)
         name = org.get_name()
         location = org.get_location()["nid"]
         datestamp = org.get_date()["key"]
         org_type = org.get_org_type()
-        form = OrganizationAdd(org_type=org_type)
+        if org_type == "Deelname":
+            org_type_flag = True
+        else:
+            org_type_flag = False
+        form = OrganizationAdd(org_type=org_type_flag)
         form.name.data = name
         form.location.data = location
         form.datestamp.data = my_env.datestr2date(datestamp)
@@ -291,7 +296,7 @@ def race_add(org_id, race_id=None):
             racename = mg.Race(org_id).add(**params)
             flash("Race {rl} created in Organization".format(rl=racename), "success")
         # Form validated successfully, clear fields!
-        return redirect(url_for('main.race_list', org_id=org_id))
+        return redirect(url_for('main.get_race_list', org_id=org_id))
     else:
         # Get Form.
         race_add_attribs = mg.get_race_list_attribs(org_id)
@@ -323,7 +328,7 @@ def race_delete(race_id):
     org_id = race.get_org_id()
     if mg.race_delete(race_id=race_id):
         flash("Wedstrijd verwijderd.", "info")
-        return redirect(url_for('main.race_list', org_id=org_id))
+        return redirect(url_for('main.get_race_list', org_id=org_id))
     else:
         flash("Wedstrijd niet verwijderd, er zijn nog deelnemers mee verbonden.", "warning")
         return redirect(url_for('main.participant_add', race_id=race_id))

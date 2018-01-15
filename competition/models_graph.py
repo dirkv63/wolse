@@ -1,4 +1,5 @@
-import logging
+import datetime
+# import logging
 import os
 from . import lm
 # from . import ns
@@ -155,7 +156,7 @@ class Participant:
                 self.first_arrival_in_race = participant_first_id(race_id)
                 self.part_id = self.set_part_race()
         else:
-            logging.fatal("No input provided.")
+            current_app.logger.fatal("No input provided.")
             raise ValueError("CannotCreateObject")
         return
 
@@ -594,18 +595,19 @@ class Organization:
             org_type = "Deelname"
         else:
             org_type = "Wedstrijd"
+        self.set_org_type(org_type=org_type)
+        """
         if self.set_org_type(org_type):
             # Organization type changed, so re-calculate points for all races in the organization
-            racelist = race_list(self.org_node["nid"])
+            racelist = get_race_list(self.org_node["nid"])
             for rec in racelist:
                 # Probably not efficient, but then you should't change organization type too often.
                 points_for_race(rec["race_id"])
+        """
         # Check Organization name.
         if properties['name'] != self.get_name():
-            node_prop = dict(
-                name=properties["name"],
-                nid=self.org_node["nid"]
-            )
+            node_prop = ns.node_props(nid=self.get_org_id())
+            node_prop["name"] = properties["name"]
             ns.node_update(**node_prop)
         # Check location
         curr_loc_node = self.get_location()
@@ -618,16 +620,7 @@ class Organization:
             # Finally check if current location is still required. Remove if there are no more links.
             ns.remove_node(curr_loc_node)
         # Check Date
-        curr_ds_node = self.get_date()
-        if properties["datestamp"] != curr_ds_node["key"]:
-            # First create link to new date
-            self.set_date(properties["datestamp"])
-            # Then remove link from current date
-            ns.remove_relation_node(start_node=self.org_node, end_node=curr_ds_node, rel_type=org2date)
-            # Finally check if date (day, month, year) can be removed.
-            # Don't remove single date, clear all dates that can be removed. This avoids the handling of key
-            # because date nodes don't have a nid.
-            ns.clear_date()
+        self.set_date(ds=properties["datestamp"])
         return True
 
     def get_label(self):
@@ -659,10 +652,13 @@ class Organization:
         """
         This method will return the date node for the Organization.
 
-        :return: Date node
+        :return: Date node, or False if date not yet defined for the organization.
         """
         date_node = ns.get_endnode(start_node=self.org_node, rel_type=org2date)
-        return date_node
+        if isinstance(date_node, Node):
+            return date_node
+        else:
+            return False
 
     def get_name(self):
         """
@@ -709,10 +705,29 @@ class Organization:
         """
         This method will create a relation between the organization and the date. Relation type is 'On'.
         Organization Node must be available for this method.
-        @param ds: Datestamp
-        @return:
+
+        :param ds: Datestamp in datetime.date format
+
+        :return:
         """
-        date_node = ns.date_node(ds)   # Get Date (day) node
+        curr_ds_node = self.get_date()
+        if curr_ds_node:
+            # Convert date string to datetime date object.
+            # Then compare date objects to avoid formatting issues.
+            curr_ds = datetime.datetime.strptime(curr_ds_node["key"], "%Y-%m-%d").date()
+            if ds != curr_ds:
+                current_app.logger.debug("Trying to set date from {curr_ds} to {ds}".format(curr_ds=curr_ds, ds=ds))
+                # Remove current link from organization to date
+                ns.remove_relation_node(start_node=self.org_node, end_node=curr_ds_node, rel_type=org2date)
+                # Check if date (day, month, year) can be removed.
+                # Don't remove single date, clear all dates that can be removed. This avoids the handling of key
+                # because date nodes don't have a nid.
+                ns.clear_date()
+            else:
+                # Link organization to date exists and no need to change
+                return True
+        # Create new (or updated) link from organization to date
+        date_node = ns.date_node(ds)  # Get Date (day) node
         ns.create_relation(from_node=self.org_node, rel=org2date, to_node=date_node)
         return
 
@@ -804,6 +819,8 @@ class Race:
         if isinstance(categorie_nodes, list):
             for categorie_node in categorie_nodes:
                 ns.create_relation(from_node=self.race_node, rel=race2category, to_node=categorie_node)
+        # Categories set, now set the race sequence number
+        self.set_seq()
         link_mf(mf=props["mf"], node=self.race_node, rel=race2mf)
         return self.race_node["racename"]
 
@@ -834,6 +851,8 @@ class Race:
         remove_rels = [node for node in current_cat_nodes if node not in categorie_nodes]
         for end_node in remove_rels:
             ns.remove_relation(start_nid=self.race_node["nid"], end_nid=end_node["nid"], rel_type=race2category)
+        # Categories set, now set the race sequence number
+        self.set_seq()
         link_mf(mf=props["mf"], node=self.race_node, rel=race2mf)
         return self.race_node["racename"]
 
@@ -920,12 +939,24 @@ class Race:
         """
         This method will set the organization object for the race.
 
-        :return: (nothing, organization object will be set.
+        :return: (nothing, organization object will be set.)
         """
         org_node = ns.get_startnode(end_node=self.race_node, rel_type=org2race)
         self.org = Organization(org_id=org_node["nid"])
         return
 
+    def set_seq(self):
+        """
+        This method will set the sequence of the race. On initialization, this will be the lowest sequence from the
+        associated categories.
+
+        :return:  (nothing, the sequence attribute will have been set for the race.)
+        """
+        seq = ns.get_race_seq(self.race_node["nid"])
+        race_props = ns.node_props(self.race_node["nid"])
+        race_props["seq"] = seq
+        ns.node_update(**race_props)
+        return
 
 class Location:
 
@@ -982,24 +1013,29 @@ def organization_delete(org_id=None):
     This method will delete an organization. This can be done only if there are no more races attached to the
     organization. If an organization is removed, then check is done for orphan date and orphan location. If available,
     these will also be removed.
-    @param org_id:
-    @return:
+
+    :param org_id:
+
+    :return:
     """
-    if ns.get_end_nodes(start_node_id=org_id, rel_type="has"):
-        logging.info("Organization with id {org_id} cannot be removed, races are attached.".format(org_id=org_id))
+    org = Organization(org_id=org_id)
+    org_node = org.get_node()
+    org_label = org.get_label()
+    if ns.get_endnodes(start_node=org_node, rel_type="has"):
+        current_app.logger.info("Organization {label} cannot be removed, races are attached.".format(label=org_label))
         return False
     else:
         # Remove Organization
-        logging.debug("trying to remove org")
-        ns.remove_node_force(org_id)
+        current_app.logger.debug("Trying to remove organization {l}".format(l=org_label))
+        ns.remove_node_force(nid=org_id)
         # Check if this results in orphan dates, remove these dates
-        logging.debug("Then trying to remove date")
+        current_app.logger.debug("Then remove all orphan dates")
         ns.clear_date()
         # Check if this results in orphan locations, remove these locations.
-        logging.debug("Trying to delete organization")
+        current_app.logger.debug("Trying to delete orphan organizations.")
         ns.clear_locations()
-        logging.debug("All done")
-        logging.info("Organization with id {org_id} removed.".format(org_id=org_id))
+        current_app.logger.debug("All done")
+        current_app.logger.info("Organization {l} removed.".format(l=org_label))
         return True
 
 
@@ -1055,7 +1091,7 @@ def get_race_type_node(racetype):
         racetype_node = ns.get_node("RaceType", **props)
         return racetype_node
     else:
-        logging.error("RaceType unknown: {racetype}.".format(racetype=racetype))
+        current_app.logger.error("RaceType unknown: {racetype}.".format(racetype=racetype))
         return False
 
 
@@ -1075,11 +1111,11 @@ def get_race_list_attribs(org_id):
 
     :param org_id: Node ID of the organization.
 
-    :return: Parameters for the Race List macro: org_id, org_label, races (race_list) and remove_org flag.
+    :return: Parameters for the Race List macro: org_id, org_label, races (get_race_list) and remove_org flag.
     """
     org = Organization(org_id=org_id)
     # org.set(org_id)
-    races = race_list(org_id)
+    races = get_race_list(org_id)
     if len(races) > 0:
         remove_org = "No"
     else:
@@ -1126,7 +1162,7 @@ def link_mf(mf, node, rel):
     return
 
 
-def race_list(org_id):
+def get_race_list(org_id):
     """
     This function will return a list of races for an organization ID
 
@@ -1258,7 +1294,7 @@ def person_list():
             races=len(person.get_races4person())
         )
         person_arr.append(person_dict)
-        persons_sorted = sorted(person_arr, key=lambda x: (x["cat_seq"], x["mf"], x["name"]))
+    persons_sorted = sorted(person_arr, key=lambda x: (x["cat_seq"], x["mf"], x["name"]))
     return persons_sorted
 
 
@@ -1276,7 +1312,7 @@ def person4participant(part_id):
         person_name = person_node["name"]
         return dict(name=person_name, nid=person_nid)
     else:
-        logging.error("Cannot find person for participant node nid: {part_id}".format(part_id=part_id))
+        current_app.logger.error("Cannot find person for participant node nid: {part_id}".format(part_id=part_id))
         return False
 
 
@@ -1342,7 +1378,7 @@ def get_location(nid):
     if loc:
         return loc["city"]
     else:
-        logging.fatal("Location expected but not found for nid {nid}".format(nid=nid))
+        current_app.logger.fatal("Location expected but not found for nid {nid}".format(nid=nid))
         return False
 
 

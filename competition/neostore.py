@@ -64,11 +64,13 @@ class NeoStore:
         # Note that you could DETACH DELETE location nodes here, but then you miss the opportunity to log what is
         # removed.
         query = """
-            MATCH (loc:Location) WHERE NOT (loc)--() RETURN loc.nid as loc_nid, loc.city as city
+            MATCH (loc:Location) WHERE NOT (loc)--() RETURN loc
         """
-        res = self.graph.run(query).data()
-        for loc in res:
-            logging.info("Remove location {city} with nid {loc_nid}".format(city=loc['city'], loc_nid=loc['loc_nid']))
+        cursor = self.graph.run(query)
+        while cursor.forward():
+            rec = cursor.current()
+            loc = rec['loc']
+            current_app.logger.info("Remove location {city}".format(city=loc['city']))
             self.remove_node(loc)
         return
 
@@ -142,7 +144,8 @@ class NeoStore:
         Finally find years with one relation only, this must be a connection to the Gregorian calendar. Remove these
         years.
         Compare with method remove_date(ds), that will check to remove only a specific date.
-        @return:
+
+        :return:
         """
         # First Remove Days
         self.clear_date_node("Day")
@@ -163,14 +166,17 @@ class NeoStore:
         """
         This method will get a datetime.date timestamp and return the associated node. The calendar module will
         ensure that the node is created if required.
-        @param ds: datetime.date representation of the date, or Calendar key 'YYYY-MM-DD'.
-        @return: node associated with the date, of False (ds could not be formatted as a date object).
+
+        :param ds: datetime.date representation of the date, or Calendar key 'YYYY-MM-DD'.
+
+        :return: node associated with the date, of False (ds could not be formatted as a date object).
         """
         # If date format is string, convert to datetime object
         if isinstance(ds, str):
             try:
                 ds = datetime.strptime(ds, '%Y-%m-%d').date()
             except ValueError:
+                current_app.logger.error("Trying to set date {ds} but got a value error".format(ds=ds))
                 return False
         if isinstance(ds, date):
             date_node = self.calendar.date(ds.year, ds.month, ds.day).day   # Get Date (day) node
@@ -571,12 +577,10 @@ class NeoStore:
         """
         # Todo: review Query to check if result set can contain nodes instead of fields.
         query = """
-            MATCH (org:Organization)-[:has]->(race:Race),
-                  (race)-[:forCategory]->(category:Category),
-                  (race)-[:forMF]->(mf:MF)
+            MATCH (org:Organization)-[:has]->(race:Race)-[:forMF]->(mf:MF)
             WHERE org.nid = '{org_id}'
-            RETURN race, category, mf
-            ORDER BY category.seq, mf.name
+            RETURN race, mf
+            ORDER BY race.seq, mf.name
         """.format(org_id=org_id)
         res = self.graph.run(query)
         # Convert result set in an array of nodes
@@ -585,7 +589,6 @@ class NeoStore:
             rec = res.current()
             race_nodes = dict(
                 race=rec["race"],
-                category=rec["category"],
                 mf=rec["mf"]
             )
             res_arr.append(race_nodes)
@@ -622,6 +625,25 @@ class NeoStore:
                             loc=dict(rec['loc']))
             race4person.append(res_dict)
         return race4person
+
+    def get_race_seq(self, race_id):
+        """
+        This method will calculate the sequence for the race with nid race_id. The calculated sequence is the lowest
+        sequence for the associated categories.
+
+        :param race_id: nid of the race.
+
+        :return: lowest sequence number of the associated categories.
+        """
+        query = """
+            MATCH (race:Race)-[:forCategory]->(category:Category)
+            WHERE race.nid = '{race_id}'
+            RETURN category.seq AS seq
+            ORDER BY category.seq
+            LIMIT 1
+        """
+        res = self.graph.run(query).data()
+        return res['seq']
 
     def get_relations(self):
         """
@@ -953,7 +975,7 @@ class NeoStore:
                 current_app.logger.warning(msg)
                 return False
         else:
-            current_app.logger.error("Node expected, but got type {t}".format(t=type(node)))
+            current_app.logger.error("Node expected, but got type {t} Input: {n}".format(t=type(node), n=node))
             return False
 
     def remove_node2br(self, nid):
@@ -981,15 +1003,15 @@ class NeoStore:
     def remove_node_force(self, nid):
         """
         This method will remove node with ID node_id. The node and the relations to/from the node will also be deleted.
-        Use 'remove_node2br' to remove nodes only when there should be no relations attached to it.
+        Note that this needs to use nid instead of node, since graph.delete has a CONSTRAINT on relations.
 
         :param nid: nid of the node
 
-        :return: True if node is deleted, False otherwise
+        :return:
         """
         query = "MATCH (n) WHERE n.nid='{nid}' DETACH DELETE n".format(nid=nid)
         self.graph.run(query)
-        return True
+        return
 
     def remove_relation(self, start_nid=None, end_nid=None, rel_type=None):
         """

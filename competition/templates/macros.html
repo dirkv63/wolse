@@ -22,11 +22,12 @@
         <tr>
             <th>Wedstrijden</th>
         </tr>
-        {% for row in races %}
+        {% for rec in races %}
+
         <tr>
             <td>
-                <a href="{{ url_for('main.participant_list', race_id=row.race_id, org_id=org_id) }}">
-                    {{ row.racename}}
+                <a href="{{ url_for('main.participant_list', race_id=rec['race']['nid']) }}">
+                    {{ rec['race']['racename'] }}
                 </a>
             </td>
         </tr>
