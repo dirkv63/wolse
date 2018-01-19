@@ -97,8 +97,11 @@ class User(UserMixin):
         Find the user. If the user exists, verify the password. If the passwords match, return nid of the User node.
         If the passwords don't match, return False.
         If the user does not exists, return False.
+
         :param name:
+
         :param pwd:
+
         :return:
         """
         if self.find(name):
@@ -1265,6 +1268,27 @@ def race_delete(race_id=None):
         msg = "Race {rl} removed.".format(rl=rl)
         current_app.logger.info(msg)
         return True
+
+
+def races_generate(org_id):
+    """
+    This method will generate all races (combination of MF and categories) for an organization.
+
+    :param org_id: nid of the organization.
+
+    :return:
+    """
+    categories = ns.get_nodes("Category")
+    for cat_node in categories:
+        for mf in ['man', 'vrouw']:
+            race_props = dict(
+                categories=[cat_node["nid"]],
+                mf=mf,
+                short=False,
+                name=False
+            )
+            Race(org_id=org_id).add(**race_props)
+    return
 
 
 def person_list():

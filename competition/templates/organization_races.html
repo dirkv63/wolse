@@ -51,7 +51,7 @@
                                     <a href="{{ url_for('main.organization_delete', org_id=org_id) }}" class="btn btn-danger" role="button">
                                         Verwijderen
                                     </a>
-                                    <a href="{{ url_for('main.get_race_list', org_id=org_id) }}" class="btn btn-warning" role="button">
+                                    <a href="{{ url_for('main.race_list', org_id=org_id) }}" class="btn btn-warning" role="button">
                                         Annuleer
                                     </a>
                                 </div>
@@ -62,6 +62,11 @@
                 <a href="{{ url_for('main.race_add', org_id=org_id) }}" class="btn btn-default">
                     Wedstrijd toevoegen
                 </a>
+                {% if remove_org is equalto "Yes" %}
+                    <a href="{{ url_for('main.races_default', org_id=org_id) }}" class="btn btn-default">
+                        Default wedstrijden
+                    </a>
+                {% endif %}
             </div>
         </div>
     {% endif %}

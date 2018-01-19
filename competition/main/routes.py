@@ -251,7 +251,7 @@ def organization_delete(org_id):
         return redirect(url_for('main.organization_list'))
     else:
         flash("Organizatie niet verwijderd, er zijn nog wedstrijden mee verbonden.", "warning")
-        return url_for('main.race_add(org_id)', org_id=org_id)
+        return redirect(url_for('main.race_add', org_id=org_id))
 
 
 @main.route('/race/<org_id>/list')
@@ -296,7 +296,7 @@ def race_add(org_id, race_id=None):
             racename = mg.Race(org_id).add(**params)
             flash("Race {rl} created in Organization".format(rl=racename), "success")
         # Form validated successfully, clear fields!
-        return redirect(url_for('main.get_race_list', org_id=org_id))
+        return redirect(url_for('main.race_list', org_id=org_id))
     else:
         # Get Form.
         race_add_attribs = mg.get_race_list_attribs(org_id)
@@ -310,6 +310,26 @@ def race_add(org_id, race_id=None):
             race_add_attribs["racename"] = race.get_racename()
         race_add_attribs['form'] = form
         return render_template('organization_races.html', **race_add_attribs)
+
+
+@main.route('/races_default/<org_id>')
+@login_required
+def races_default(org_id):
+    """
+    This method will add a list of default races for an organization. No check is done if races exist already.
+    The races need to be modified for combination or short race.
+
+    :param org_id: Organization nid.
+
+    :return: Redirect to the races_list for the organization
+    """
+    nr_races = len(mg.get_race_list(org_id=org_id))
+    if nr_races == 0:
+        mg.races_generate(org_id)
+    else:
+        msg = "Cannot generate races, there are {n} races defined already.".format(n=nr_races)
+        flash(msg, "error")
+    return redirect(url_for('main.race_list', org_id=org_id))
 
 
 @main.route('/race/delete/<race_id>', methods=['GET', 'POST'])
@@ -328,7 +348,7 @@ def race_delete(race_id):
     org_id = race.get_org_id()
     if mg.race_delete(race_id=race_id):
         flash("Wedstrijd verwijderd.", "info")
-        return redirect(url_for('main.get_race_list', org_id=org_id))
+        return redirect(url_for('main.race_list', org_id=org_id))
     else:
         flash("Wedstrijd niet verwijderd, er zijn nog deelnemers mee verbonden.", "warning")
         return redirect(url_for('main.participant_add', race_id=race_id))

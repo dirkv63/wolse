@@ -4,7 +4,7 @@
 
 {% block page_content %}
 <div class="row">
-    <h1><a href="{{ url_for('main.get_race_list', org_id=org_id) }}">{{ race_label }}</a></h1>
+    <h1><a href="{{ url_for('main.race_list', org_id=org_id) }}">{{ race_label }}</a></h1>
     <div class="col-md-8">
         {{ macros.race_finishers(finishers, race_id) }}
     </div>

@@ -622,7 +622,7 @@ class NeoStore:
                             date=dict(rec['day']),
                             org=dict(rec['org']),
                             racetype=dict(rec['racetype']),
-                            loc=dict(rec['loc']))
+                              loc=dict(rec['loc']))
             race4person.append(res_dict)
         return race4person
 
@@ -641,8 +641,8 @@ class NeoStore:
             RETURN category.seq AS seq
             ORDER BY category.seq
             LIMIT 1
-        """
-        res = self.graph.run(query).data()
+        """.format(race_id=race_id)
+        res = self.graph.run(query).data()[0]
         return res['seq']
 
     def get_relations(self):

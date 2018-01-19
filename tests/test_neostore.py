@@ -36,6 +36,7 @@ class TestNeoStore(unittest.TestCase):
         self.app_ctx.pop()
 
     def test_remove_relation(self):
+        nr_nodes = self.ns.get_nodes()
         # First create 2 nodes and a relation
         label = "TestNode"
         node1_params = dict(
@@ -52,8 +53,10 @@ class TestNeoStore(unittest.TestCase):
         self.ns.remove_relation_node(start_node=node1_node, end_node=node2_node, rel_type=rel)
         self.ns.remove_node_force(node1_node["nid"])
         self.ns.remove_node_force(node2_node["nid"])
+        self.assertEqual(self.ns.get_nodes(), nr_nodes)
 
     def test_get_nodes(self):
+        nr_nodes = self.ns.get_nodes()
         # First create 2 nodes and a relation
         label = "Test_Get_Nodes"
         node1_params = dict(
@@ -84,7 +87,30 @@ class TestNeoStore(unittest.TestCase):
         self.ns.remove_node_force(res_node_2["nid"])
         # Verify all nodes are removed
         self.assertFalse(self.ns.get_nodes(label))
+        # Check same number of nodes at the end as on the beginning
+        self.assertEqual(self.ns.get_nodes(), nr_nodes)
 
+    def test_node_count(self):
+        # 2 MF Nodes
+        label = "MF"
+        nr = len(self.ns.get_nodes(label))
+        self.assertEqual(nr, 2)
+        # 2 OrgType Nodes
+        label = "OrgType"
+        nr = len(self.ns.get_nodes(label))
+        self.assertEqual(nr, 2)
+        # 1 User Node
+        label = "User"
+        nr = len(self.ns.get_nodes(label))
+        self.assertEqual(nr, 1)
+        # 12 Category Nodes
+        label = "Category"
+        nr = len(self.ns.get_nodes(label))
+        self.assertEqual(nr, 12)
+        # 1 CategoryGroup Node
+        label = "categoryGroup"
+        nr = len(self.ns.get_nodes(label))
+        self.assertEqual(nr, 1)
 
 if __name__ == "__main__":
     unittest.main()
