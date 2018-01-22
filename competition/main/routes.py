@@ -409,9 +409,8 @@ def participant_add(race_id):
         runner_id = form.name.data
         prev_runner_id = form.prev_runner.data
         # Create the participant node, connect to person and to race.
-        part = mg.Participant(race_id=race_id, pers_id=runner_id)
-        part.add(prev_pers_id=prev_runner_id)
-        # Collect properties for this participant
+        part = mg.Participant(race_id=race_id, person_id=runner_id, prev_person_id=prev_runner_id)
+        # Collect properties for this participant so that they can be added to the participant node.
         props = {}
         for prop in part_config_props:
             if form.data[prop]:
@@ -424,7 +423,8 @@ def participant_add(race_id):
         part_last = mg.participant_last_id(race_id)
         # Initialize Form
         form = ParticipantAdd(prev_runner=part_last)
-        form.name.choices = mg.next_participant(race_id)
+        next_part_nodes = race.get_next_part()
+        form.name.choices = [(x["nid"], x["name"]) for x in next_part_nodes]
         form.prev_runner.choices = mg.participant_after_list(race_id)
         param_dict = dict(
             form=form,
@@ -484,9 +484,11 @@ def participant_edit(part_id):
 def participant_remove(race_id, pers_id):
     """
     This method will remove the participant from the race and return to the race.
-    Ask for confirmation is not done (anymore).
+
     :param race_id: ID of the race. This can be calculated, but it is always available.
+
     :param pers_id: Node ID of the participant in the race.
+
     :return:
     """
     """
@@ -501,7 +503,7 @@ def participant_remove(race_id, pers_id):
     elif request.method == "POST":
         if form.submit_ok.data:
     """
-    part = mg.Participant(race_id=race_id, pers_id=pers_id)
+    part = mg.Participant(race_id=race_id, person_id=pers_id)
     part.remove()
     return redirect(url_for('main.participant_add', race_id=race_id))
 

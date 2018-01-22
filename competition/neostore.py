@@ -269,9 +269,11 @@ class NeoStore:
 
     def get_cat4part(self, part_nid):
         """
-        This method will return category for the participant. Category will be 'Dames' or 'Heren'.
-        @param part_nid: Nid of the participant node.
-        @return: Category (Dames or Heren), or False if no category could be found.
+        This method will return category for the participant.
+
+        :param part_nid: Nid of the participant node.
+
+        :return: Category, or False if no category could be found.
         """
         query = "MATCH (n:Participant {nid:{p}})<-[:is]-()-[:mf]->(c:MF) RETURN c.name as name"
         res = self.graph.run(query, p=part_nid)
@@ -477,13 +479,73 @@ class NeoStore:
             rec["date"] = datetime.strptime(rec["date"], "%Y-%m-%d").strftime("%d-%m-%Y")
         return res
 
+    def get_part_for_org(self, org_id):
+        """
+        This method will return a list of people that participate in a race for this organization.
+
+        :param org_id: Nid of the organization
+
+        :return:
+        """
+        query = """
+            MATCH (n:Organization)-[:has]->(m:Race)<-[:participates]-(d:Participant)<-[:is]-(p:Person)
+            WHERE n.nid = '{org_id}'
+            RETURN p
+        """.format(org_id=org_id)
+        res = self.graph.run(query)
+        return nodelist_from_cursor(res)
+
+    def get_next_parts_for_race(self, race_id):
+        """
+        This method will get the list of people that can be the next participant of the race. So they are in the range
+        of the race, but not yet seleccted as a participant.
+
+        :param race_id: Nid of the race.
+
+        :return: Person node list for potential participants.
+        """
+        query = """
+            MATCH (race:Race)-[:forCategory]->(cat:Category),
+                (race)-[:forMF]-(mf:MF),
+                (person:Person)-[:inCategory]->(cat),
+                (person)-[:mf]->(mf)
+            WHERE race.nid='{race_id}'
+            AND NOT EXISTS ((person)-[:is]->(:Participant)-[:participates]->(race))
+            RETURN person
+        """.format(race_id=race_id)
+        res = self.graph.run(query)
+        return nodelist_from_cursor(res)
+
+    def get_part_range_for_race(self, race_id):
+        """
+        This method will get the range of people that can participate in the race. So everyone who is in one of the race
+        categories and required MF.
+
+        :param race_id:
+
+        :return:
+        """
+        query = """
+            MATCH (race:Race)-[:forCategory]->(cat:Category),
+                (race)-[:forMF]-(mf:MF),
+                (person:Person)-[:inCategory]->(cat),
+                (person)-[:mf]->(mf)
+                WHERE race.nid='{race_id}'
+                RETURN (person)
+        """.format(race_id=race_id)
+        res = self.graph.run(query)
+        return nodelist_from_cursor(res)
+
     def get_participant_in_race(self, pers_id=None, race_id=None):
         """
         This function will for a person get the participant node in a race, or False if the person did not
         participate in the race according to current information in the database.
-        @param pers_id:
-        @param race_id:
-        @return: participant node, or False
+
+        :param pers_id:
+
+        :param race_id:
+
+        :return: participant node, or False
         """
         query = """
             MATCH (pers:Person)-[:is]->(part:Participant)-[:participates]->(race:Race)
@@ -1071,8 +1133,10 @@ def nodelist_from_cursor(cursor):
     """
     The py2neo Cursor will return a result list that is not necessarily unique. This function gets a cursor from
     a query where the cypher return argument is a single node. The function will return the list of unique nodes.
-    @param cursor:
-    @return: list of unique nodes, or empty list if there are no nodes.
+
+    :param cursor: Result of a query with single node per result line.
+
+    :return: list of unique nodes, or empty list if there are no nodes.
     """
     node_list = set()
     while cursor.forward():
