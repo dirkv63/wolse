@@ -269,19 +269,19 @@ class NeoStore:
 
     def get_cat4part(self, part_nid):
         """
-        This method will return category for the participant.
+        This method will return category NID for the participant.
 
         :param part_nid: Nid of the participant node.
 
-        :return: Category, or False if no category could be found.
+        :return: Category NID, or False if no category could be found.
         """
-        query = "MATCH (n:Participant {nid:{p}})<-[:is]-()-[:mf]->(c:MF) RETURN c.name as name"
+        query = "MATCH (n:Participant {nid:{p}})<-[:is]-()-[:inCategory]->(c:Category) RETURN c.nid as nid"
         res = self.graph.run(query, p=part_nid)
         try:
             rec = res.next()
         except StopIteration:
             return False
-        return rec["name"]
+        return rec["nid"]
 
     def get_category_nodes(self):
         """
@@ -504,13 +504,14 @@ class NeoStore:
 
         :return: Person node list for potential participants.
         """
+        #  Todo: Next participant should not occur anywhere in the organization.
         query = """
-            MATCH (race:Race)-[:forCategory]->(cat:Category),
+            MATCH (org:Organization)-[:has]->(race:Race)-[:forCategory]->(cat:Category),
                 (race)-[:forMF]-(mf:MF),
                 (person:Person)-[:inCategory]->(cat),
                 (person)-[:mf]->(mf)
             WHERE race.nid='{race_id}'
-            AND NOT EXISTS ((person)-[:is]->(:Participant)-[:participates]->(race))
+            AND NOT EXISTS ((person)-[:is]->(:Participant)-[:participates]->(:Race)<-[:has]-(org:Organization))
             RETURN person
         """.format(race_id=race_id)
         res = self.graph.run(query)

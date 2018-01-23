@@ -898,12 +898,17 @@ class Race:
         race_type = self.get_racetype()
         node_list = ns.get_participant_seq_list(self.race_node["nid"])
         if node_list:
+            cat_cnt = {}
+            cat_lst = self.get_cat_nids()
+            for k in cat_lst:
+                cat_cnt[k] = 0
             cnt = 0
             for part in node_list:
-                cat = get_cat4part(part)
+                cat = get_cat4part(part["nid"])
+                cat_cnt[cat] += 1
                 cnt += 1
                 if race_type == "Wedstrijd":
-                    points = points_race(cnt)
+                    points = points_race(cat_cnt[cat])
                 elif race_type == "Short":
                     points = points_short(cnt)
                 elif race_type == "Deelname":
@@ -1011,7 +1016,10 @@ class Race:
 
         :return: Type of the race: Wedstrijd, Korte Cross or Deelname
         """
-        return self.org.get_org_type()
+        if self.is_short():
+            return "Short"
+        else:
+            return self.org.get_org_type()
 
     def is_short(self):
         """
@@ -1019,7 +1027,7 @@ class Race:
 
         :return: True - this race is a short cross, False (None)- this race is not a short cross.
         """
-        if self.race_node["short"]:
+        if self.race_node["short"] == "Yes":
             return True
         else:
             return False
@@ -1428,9 +1436,11 @@ def person4participant(part_id):
 
 def get_cat4part(part_nid):
     """
-    This method will return category for the participant. Category will be 'Dames' or 'Heren'.
-    @param part_nid: Nid of the participant node.
-    @return: Category (Dames or Heren), or False if no category could be found.
+    This method will return category nid for the participant.
+
+    :param part_nid: Nid of the participant node.
+
+    :return: Category NID, or False if no category could be found.
     """
     return ns.get_cat4part(part_nid)
 
