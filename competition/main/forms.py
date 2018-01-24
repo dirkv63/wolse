@@ -43,14 +43,14 @@ class ParticipantAdd(Form):
     """
     name = SelectField('Naam', coerce=str)
     pos = StringField('Plaats')
-    remark = StringField('Opm.')
+    # remark = StringField('Opm.')
     prev_runner = SelectField('Aankomst na:', coerce=str)
     submit = SubmitField('OK')
 
 
 class ParticipantEdit(Form):
     pos = StringField('Plaats')
-    remark = StringField('Opm.')
+    # remark = StringField('Opm.')
     submit = SubmitField('OK')
 
 

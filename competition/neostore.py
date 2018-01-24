@@ -671,10 +671,10 @@ class NeoStore:
         query = """
             MATCH (person:Person)-[:is]->(part:Participant)-[:participates]->(race:Race),
                   (race)<-[:has]-(org:Organization)-[:On]->(day:Day),
-                  (race)-[:type]->(racetype:RaceType),
+                  (org)-[:type]->(orgtype),
                   (org)-[:In]->(loc:Location)
             WHERE person.nid='{pers_id}'
-            RETURN race, part, day, org, racetype, loc
+            RETURN race, part, day, org, orgtype, loc
             ORDER BY day.key ASC
         """.format(pers_id=person_id)
         cursor = self.graph.run(query)
@@ -684,8 +684,8 @@ class NeoStore:
                             race=dict(rec['race']),
                             date=dict(rec['day']),
                             org=dict(rec['org']),
-                            racetype=dict(rec['racetype']),
-                              loc=dict(rec['loc']))
+                            orgtype=dict(rec['orgtype']),
+                            loc=dict(rec['loc']))
             race4person.append(res_dict)
         return race4person
 

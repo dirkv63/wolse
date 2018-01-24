@@ -14,7 +14,8 @@ from . import main
 **Time** is currently not part of the participant properties. It is not part of wtforms 2, wtforms 3 is not yet
 released for pip and it may not be required at all: the data may not always be available, and a hassle to add the data.
 """
-part_config_props = ["pos", "remark"]
+# part_config_props = ["pos", "remark"]
+part_config_props = ["pos"]
 
 
 @main.route('/login', methods=['GET', 'POST'])
