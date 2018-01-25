@@ -7,14 +7,14 @@
         <h1>{{ cat }} - Stand</h1>
         <table class="table table-hover">
             <tr>
-                <th>Plaats</th>
+                <th>Category</th>
                 <th>Naam</th>
                 <th>Punten</th>
                 <th>#</th>
             </tr>
             {% for row in result_set %}
             <tr>
-                <td>{{ loop.index }}</td>
+                <td>{{ row[4] }}</td>
                 <td>{% if row[2] > 6 %}<b>{% endif %}
                     <a href="{{ url_for('main.results', cat=cat, person_id=row[3]) }}">
                         {{ row[0] }}

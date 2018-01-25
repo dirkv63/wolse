@@ -1642,6 +1642,7 @@ def results_for_category(cat):
 
     :return: Sorted list with tuples (name, points, number of races, nid for person).
     """
+    # Todo: review this procedure...
     res = ns.points_per_category(cat)
     # 1. Add points to list per person
     result_list = {}
@@ -1657,8 +1658,11 @@ def results_for_category(cat):
             result_list[rec["name"]] = [rec["points"]]
     # 2. Calculate points per person
     for name in result_list:
-        result_total.append([name, points_sum(result_list[name]), len(result_list[name]), nid4name[name]])
-    result_sorted = sorted(result_total, key=lambda x: -x[1])
+        person = Person(person_id=nid4name[name])
+        cat = person.get_category()
+        result_total.append([name, points_sum(result_list[name]), len(result_list[name]), nid4name[name],
+                             cat["name"], cat["seq"]])
+    result_sorted = sorted(result_total, key=lambda x: (x[5], -x[1]))
     return result_sorted
 
 

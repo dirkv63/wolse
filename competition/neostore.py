@@ -591,11 +591,15 @@ class NeoStore:
         """
         This query will for the specified category collect every participation and points that go with the participation
         for every person in the category.
+
         :param cat:
+
         :return: A cursor with records having the name, nid and points for each participation on every race.
         """
-        query = "match (c:MF {name:{cat}})<-[:mf]-(n:Person)-[:is]->(p) " \
-                "return n.name as name, n.nid as nid, p.points as points"
+        query = """
+            MATCH (c:MF {name:{cat}})<-[:mf]-(n:Person)-[:is]->(p)
+            RETURN n.name as name, n.nid as nid, p.points as points
+        """
         res = self.graph.run(query, cat=cat)
         return res
 
