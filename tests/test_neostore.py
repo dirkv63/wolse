@@ -112,10 +112,10 @@ class TestNeoStore(unittest.TestCase):
         nr = len(self.ns.get_nodes(label))
         self.assertEqual(nr, 1)
 
-    def test_get_participants_for_race(self):
-        org_id = "b041f5ec-f40e-492e-8126-a59e48bdd236"
-        part_nodes = self.ns.get_part_for_org(org_id=org_id)
-        print("Part_nodes: {pn}".format(pn=part_nodes))
+    def test_points_race(self):
+        res = self.ns.points_race('Dames', '7753e70d-2a0f-4c82-af5f-7f98b5ab35dc', orgtype="Wedstrijd")
+        for rec in res:
+            print(rec)
 
 if __name__ == "__main__":
     unittest.main()

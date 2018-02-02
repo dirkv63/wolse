@@ -43,6 +43,8 @@ mf_tx = dict(
 # mf_tx_inf translates from Node name to man/vrouw value.
 mf_tx_inv = {y: x for x, y in mf_tx.items()}
 
+# Calculate points
+points_per_deelname = 20
 
 class User(UserMixin):
     """
@@ -1455,6 +1457,21 @@ def get_category_list():
     return [(catn["nid"], catn["name"]) for catn in ns.get_category_nodes()]
 
 
+def get_category_name(cat_nid):
+    """
+    This method will get category name from a category nid.
+
+    :param cat_nid:
+
+    :return: Category name
+    """
+    params = dict(
+        nid=cat_nid
+    )
+    cat_node = ns.get_node(**params)
+    return cat_node["name"]
+
+
 def get_cat_short_cross():
     """
     This method will collect the categories for the short cross.
@@ -1622,8 +1639,8 @@ def points_sum(point_list):
     :return: sum of the points
     """
     # Todo: points for 'deelname' should be calculated separately and in full
-    nr_races = 7
-    add_points_per_race = 10
+    nr_races = 6
+    add_points_per_race = 5
     max_list = sorted(point_list)[-nr_races:]
     if len(point_list) > nr_races:
         add_points = (len(point_list) - nr_races) * add_points_per_race
@@ -1633,35 +1650,79 @@ def points_sum(point_list):
     return points
 
 
-def results_for_category(cat):
+def results_for_category(mf, cat):
     """
-    This method will calculate the points for all participants in a category. Split up in points for wedstrijd and
+    This method will calculate the points for all participants in mf and category. Split up in points for wedstrijd and
     points for deelname at this point.
 
-    :param cat: Category to calculate the points
+    :param mf: Dames / Heren
+
+    :param cat: NID for the category
 
     :return: Sorted list with tuples (name, points, number of races, nid for person).
     """
-    # Todo: review this procedure...
-    res = ns.points_per_category(cat)
-    # 1. Add points to list per person
+    # Wedstrijden
+    res_wedstrijd = ns.points_race(mf=mf, cat=cat, orgtype="Wedstrijd")
     result_list = {}
-    result_total = []
-    nid4name = {}
-    while res.forward():
-        rec = res.current()
-        # Remember the nid for this participant.
-        nid4name[rec["name"]] = rec["nid"]
+    for df_line in res_wedstrijd.iterrows():
+        rec = df_line[1].to_dict()
         try:
-            result_list[rec["name"]].append(rec["points"])
+            result_list[rec["person_nid"]].append(rec["points"])
         except KeyError:
-            result_list[rec["name"]] = [rec["points"]]
-    # 2. Calculate points per person
-    for name in result_list:
-        person = Person(person_id=nid4name[name])
+            result_list[rec["person_nid"]] = [rec["points"]]
+    # Then collect totals for every participant
+    wedstrijd_total = {}
+    for nid in result_list:
+        params = dict(
+            wedstrijd_nr=len(result_list[nid]),
+            wedstrijd_points=points_sum(result_list[nid])
+        )
+        wedstrijd_total[nid] = params
+    # Deelnames
+    res_deelname = ns.points_race(mf=mf, cat=cat, orgtype="Deelname")
+    result_list = {}
+    for df_line in res_deelname.iterrows():
+        rec = df_line[1].to_dict()
+        try:
+            result_list[rec["person_nid"]].append(rec["points"])
+        except KeyError:
+            result_list[rec["person_nid"]] = [rec["points"]]
+    # Then collect totals for every participant
+    deelname_total = {}
+    for nid in result_list:
+        params = dict(
+            deelname_nr=len(result_list[nid]),
+            deelname_points=len(result_list[nid] * points_per_deelname)
+        )
+        deelname_total[nid] = params
+    # Merge wedstrijd_total and deelname_total
+    for nid in wedstrijd_total:
+        try:
+            wedstrijd_total[nid]["deelname_nr"] = deelname_total[nid]["deelname_nr"]
+            wedstrijd_total[nid]["deelname_points"] = deelname_total[nid]["deelname_points"]
+        except KeyError:
+            wedstrijd_total[nid]["deelname_nr"] = 0
+            wedstrijd_total[nid]["deelname_points"] = 0
+    # Now add participants in deelname_total and not in wedstrijd_total
+    deelname_only = [nid for nid in deelname_total if nid not in wedstrijd_total]
+    for nid in deelname_only:
+        wedstrijd_total[nid] = {}
+        wedstrijd_total[nid]["wedstrijd_nr"] = 0
+        wedstrijd_total[nid]["wedstrijd_points"] = 0
+        wedstrijd_total[nid]["deelname_nr"] = deelname_total[nid]["deelname_nr"]
+        wedstrijd_total[nid]["deelname_points"] = deelname_total[nid]["deelname_points"]
+    # Now calculate totals
+    for nid in wedstrijd_total:
+        wedstrijd_total[nid]["nr"] = wedstrijd_total[nid]["wedstrijd_nr"] + wedstrijd_total[nid]["deelname_nr"]
+        wedstrijd_total[nid]["points"] = wedstrijd_total[nid]["wedstrijd_points"] + \
+                                         wedstrijd_total[nid]["deelname_points"]
+    # Then convert dictionary in sorted list
+    result_total = []
+    for nid in wedstrijd_total:
+        person = Person(nid)
         cat = person.get_category()
-        result_total.append([name, points_sum(result_list[name]), len(result_list[name]), nid4name[name],
-                             cat["name"], cat["seq"]])
+        result_total.append([person.get_name(), wedstrijd_total[nid]["points"], wedstrijd_total[nid]["nr"],
+                             nid, cat["name"], cat["seq"]])
     result_sorted = sorted(result_total, key=lambda x: (x[5], -x[1]))
     return result_sorted
 

@@ -587,21 +587,29 @@ class NeoStore:
             return False
         return rec["nodes(result)"]
 
-    def points_per_category(self, cat):
+    def points_race(self, mf, cat, orgtype):
         """
-        This query will for the specified category collect every participation and points that go with the participation
+        This query will for the specified mf and category collect every participatant and points for the participation
         for every person in the category.
 
-        :param cat:
+        :param mf: Dames / Heren
 
-        :return: A cursor with records having the name, nid and points for each participation on every race.
+        :param cat: Category Nid
+
+        :param orgtype: Wedstrijd / Deelname
+
+        :return: A dataframe with records having the person_nid and points for each participation on every race.
         """
         query = """
-            MATCH (c:MF {name:{cat}})<-[:mf]-(n:Person)-[:is]->(p)
-            RETURN n.name as name, n.nid as nid, p.points as points
+            MATCH (person:Person)-[:mf]->(mf:MF  {name: {mf}}),
+                  (person)-[:inCategory]->(cat:Category {nid: {cat}}),
+                  (person)-[:is]->(part)-[:participates]-(race:Race),
+                  (race)<-[:has]-(org:Organization),
+                  (org)-[:type]->(orgtype:OrgType {name: {orgtype}})
+            RETURN person.nid as person_nid, part.points as points
         """
-        res = self.graph.run(query, cat=cat)
-        return res
+        res = self.graph.data(query, mf=mf, cat=cat, orgtype=orgtype)
+        return DataFrame(res)
 
     def get_race_in_org(self, org_id, racetype_id, name):
         """
