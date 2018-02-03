@@ -537,6 +537,26 @@ class NeoStore:
         res = self.graph.run(query)
         return nodelist_from_cursor(res)
 
+    def get_persons_in_organization(self, org_name):
+        """
+        This method will get the person nids for the participants in an organization. This can be used to do the special
+        point calculation, e.g. +3 points for PK, +10 points for BK, ...
+
+        :param org_name: Name of the organization
+
+        :return: list of person nids that participate in the organization
+        """
+        query = """
+            MATCH (person:Person)-[:is]->(part:Participant)-[:participates]->(race:Race),
+            (race)<-[:has]-(org {name: {org_name}})
+            RETURN person.nid as person_nid
+        """
+        res = self.graph.data(query, org_name=org_name)
+        person_list = []
+        for rec in res:
+            person_list.append(rec["person_nid"])
+        return person_list
+
     def get_participant_in_race(self, pers_id=None, race_id=None):
         """
         This function will for a person get the participant node in a race, or False if the person did not
