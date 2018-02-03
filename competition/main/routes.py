@@ -519,21 +519,37 @@ def result_select_cat(mf):
 
 
 @main.route('/result/<mf>/<cat>/', methods=['GET'])
-def results(mf, cat):
+@main.route('/result/<mf>/<cat>/<person_id>')
+def results(mf, cat, person_id=None):
     result_set = mg.results_for_category(mf=mf, cat=cat)
     cat_name = mg.get_category_name(cat)
-    param_dict = dict(result_set=result_set, cat=cat_name, mf=mf)
+    param_dict = dict(
+        result_set=result_set,
+        cat_nid=cat,
+        cat=cat_name,
+        mf=mf
+    )
+    if person_id:
+        races = mg.races4person(person_id)
+        person = mg.Person(person_id)
+        person_dict = person.get_dict()
+        param_dict["races"] = races
+        param_dict["person"] = person_dict
     return render_template("result_list.html", **param_dict)
 
-@main.route('/result/<person_id>')
 def result_person(person_id):
-    # races = mg.races4person(person_id)
-    # person = mg.Person(person_id)
-    # person_dict = person.get_dict()
-    # param_dict["races"] = races
-    # param_dict["person"] = person_dict
-    # return render_template("result_list.html", result_set=result_set, cat=cat, races=races)
-    return
+    races = mg.races4person(person_id)
+    person = mg.Person(person_id)
+    person_dict = person.get_dict()
+    mf = person.get_mf()["name"]
+    cat = person.get_category()["nid"]
+    param_dict = dict(
+        races=races,
+        person=person_dict,
+        cat=cat,
+        mf=mf
+    )
+    return render_template("result_list.html", **param_dict)
 
 @main.route('/overview/<cat>', methods=['GET'])
 def overview(cat):

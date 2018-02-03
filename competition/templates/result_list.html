@@ -4,19 +4,19 @@
 {% block page_content %}
 <div class="row">
     <div class="col-lg-5">
-        <h1>{{ cat }} - Stand</h1>
+        <h1>{{ cat }}</h1>
         <table class="table table-hover">
             <tr>
-                <th>Category</th>
+                <th></th>
                 <th>Naam</th>
                 <th>Punten</th>
                 <th>#</th>
             </tr>
             {% for row in result_set %}
             <tr>
-                <td>{{ row[4] }}</td>
+                <td>{{ loop.index }}</td>
                 <td>{% if row[2] > 6 %}<b>{% endif %}
-                    <a href="{{ url_for('main.results', mf=mf, cat=cat, person_id=row[3]) }}">
+                    <a href="{{ url_for('main.results', mf=mf, cat=cat_nid, person_id=row[3]) }}">
                         {{ row[0] }}
                     </a>
                     {% if row[2] > 6 %}</b>{% endif %}

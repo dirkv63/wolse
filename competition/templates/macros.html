@@ -139,9 +139,8 @@
     <table class="table table-hover">
         <tr>
             <th></th>
-            <th>Organisatie</th>
-            <th>Plaats</th>
             <th>Wedstrijd</th>
+            <th>Plaats</th>
             <th>Type</th>
             <th>Punten</th>
         </tr>
@@ -150,16 +149,11 @@
             <td>{{ loop.index }}</td>
             <td>
                 <a href="{{ url_for('main.race_list',  org_id=row.org.nid) }}">
-                    {{ row.org.name }}
+                    {{ row.race.racename }}
                 </a>
             </td>
             <td>
                 {{ row.loc.city }}
-            </td>
-            <td>
-                <a href="{{ url_for('main.participant_list', race_id=row.race.nid) }}">
-                    {{ row.race.name }}
-                </a>
             </td>
             <td>
                 {{ row.orgtype.name }}
