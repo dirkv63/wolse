@@ -148,7 +148,7 @@
         <tr>
             <td>{{ loop.index }}</td>
             <td>
-                <a href="{{ url_for('main.race_list',  org_id=row.org.nid) }}">
+                <a href="{{ url_for('main.participant_list',  race_id=row.race.nid) }}">
                     {{ row.race.racename }}
                 </a>
             </td>

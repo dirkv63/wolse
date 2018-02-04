@@ -551,21 +551,22 @@ def result_person(person_id):
     )
     return render_template("result_list.html", **param_dict)
 
-@main.route('/overview/<cat>', methods=['GET'])
-def overview(cat):
+@main.route('/overview/<mf>', methods=['GET'])
+def overview(mf):
     """
-    This method shows the results in detail. For every person the result in every race will be shown.
+    This method shows the results in detail. For every person the result in every race will be shown. Note that
 
-    :param cat: Dames OR Heren
+    :param mf: Dames OR Heren
 
     :return: The Overview list receives the list of races, the result_set with participants in arrival sequence and a
     dictionary with person nid as key. Value is a dictionary the race results per person.
     """
     org_list = mg.organization_list()
-    result_seq = mg.results_for_category(cat)
+    result_seq = mg.results_for_mf(mf)
     param_dict = dict(
         org_list=org_list,
-        result_set=result_seq, cat=cat
+        result_set=result_seq,
+        mf=mf
     )
     result4person = {}
     # Person nid is 4th element in the tuple

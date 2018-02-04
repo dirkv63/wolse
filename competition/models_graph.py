@@ -1732,6 +1732,22 @@ def results_for_category(mf, cat):
     return result_sorted
 
 
+def results_for_mf(mf):
+    """
+    This method will consolidate results for all categories for the MF.
+
+    :param mf: Dames / Heren
+
+    :return: List sorted per category and on points within category
+    """
+    results = []
+    category_list = ns.get_category_nodes()
+    for cat in category_list:
+        result_cat = results_for_category(mf, cat["nid"])
+        results.extend(result_cat)
+    return results
+
+
 def participant_seq_list(race_id):
     """
     This method will collect the people in a race in sequence of arrival.

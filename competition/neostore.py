@@ -290,11 +290,11 @@ class NeoStore:
         :return: List of category nodes in sequence.
         """
         res = []
-        query = "MATCH (n:Category) RETURN n ORDER BY n.seq"
+        query = "MATCH (cat:Category) RETURN cat ORDER BY cat.seq"
         cursor = self.graph.run(query)
         while cursor.forward():
             rec = cursor.current()
-            res.append(rec["n"])
+            res.append(rec["cat"])
         return res
 
     def get_end_nodes(self, start_node_id=None, rel_type=None):
