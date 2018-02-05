@@ -533,9 +533,6 @@ def results(mf, cat, person_id=None):
         races = mg.races4person(person_id)
         person = mg.Person(person_id)
         person_dict = person.get_dict()
-        cat_node = person.get_category()
-        cat = cat_node["nid"]
-        param_dict["cat"] = cat
         param_dict["races"] = races
         param_dict["person"] = person_dict
     return render_template("result_list.html", **param_dict)
