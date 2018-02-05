@@ -46,6 +46,8 @@ mf_tx_inv = {y: x for x, y in mf_tx.items()}
 # Calculate points
 points_per_deelname = 20
 bonus_pk = 3
+bonus_bk = 5
+bonus_mbk = -10
 
 class User(UserMixin):
     """
@@ -1662,8 +1664,10 @@ def results_for_category(mf, cat):
 
     :return: Sorted list with tuples (name, points, number of races, nid for person).
     """
-    # Get participants for 'PK'
+    # Get participants for 'PK' and 'BK'
     pk_list = ns.get_persons_in_organization("PK")
+    bk_list = ns.get_persons_in_organization("BK")
+    mbk_list = ns.get_persons_in_organization("MBK")
     # Wedstrijden
     res_wedstrijd = ns.points_race(mf=mf, cat=cat, orgtype="Wedstrijd")
     result_list = {}
@@ -1681,7 +1685,7 @@ def results_for_category(mf, cat):
             wedstrijd_points=points_sum(result_list[nid])
         )
         wedstrijd_total[nid] = params
-    # Deelnames
+    # Deelname
     res_deelname = ns.points_race(mf=mf, cat=cat, orgtype="Deelname")
     result_list = {}
     for df_line in res_deelname.iterrows():
@@ -1721,6 +1725,10 @@ def results_for_category(mf, cat):
                                          wedstrijd_total[nid]["deelname_points"]
         if nid in pk_list:
             wedstrijd_total[nid]["points"] += bonus_pk
+        if nid in bk_list:
+            wedstrijd_total[nid]["points"] += bonus_bk
+        if nid in mbk_list:
+            wedstrijd_total[nid]["points"] += bonus_mbk
     # Then convert dictionary in sorted list
     result_total = []
     for nid in wedstrijd_total:

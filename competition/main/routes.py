@@ -533,22 +533,11 @@ def results(mf, cat, person_id=None):
         races = mg.races4person(person_id)
         person = mg.Person(person_id)
         person_dict = person.get_dict()
+        cat_node = person.get_category()
+        cat = cat_node["nid"]
+        param_dict["cat"] = cat
         param_dict["races"] = races
         param_dict["person"] = person_dict
-    return render_template("result_list.html", **param_dict)
-
-def result_person(person_id):
-    races = mg.races4person(person_id)
-    person = mg.Person(person_id)
-    person_dict = person.get_dict()
-    mf = person.get_mf()["name"]
-    cat = person.get_category()["nid"]
-    param_dict = dict(
-        races=races,
-        person=person_dict,
-        cat=cat,
-        mf=mf
-    )
     return render_template("result_list.html", **param_dict)
 
 @main.route('/overview/<mf>', methods=['GET'])

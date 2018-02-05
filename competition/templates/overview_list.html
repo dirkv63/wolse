@@ -30,10 +30,9 @@
         {% for row in result_set %}
         <tr>
             <td>{{ row[4] }}</td>
-            <td>{% if row[2] > 6 %}<b>{% endif %}
-                <a href="{{ url_for('main.results', mf=mf, cat=cat, person_id=row[3]) }}">
+            <td>
+                {% if row[2] > 6 %}<b>{% endif %}
                     {{ row[0] }}
-                </a>
                 {% if row[2] > 6 %}</b>{% endif %}
             </td>
             <td style="white-space:nowrap">{{ row[1] }}</td>
