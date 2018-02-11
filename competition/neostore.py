@@ -3,7 +3,6 @@ This class consolidates functions related to the neo4J datastore.
 """
 
 import logging
-# import os
 import sys
 import uuid
 from datetime import datetime, date
@@ -12,10 +11,6 @@ from pandas import DataFrame
 from py2neo import Graph, Node, Relationship, NodeSelector
 from py2neo.database import DBMS
 from py2neo.ext.calendar import GregorianCalendar
-# from py2neo import watch
-
-
-# watch("neo4j.http")
 
 
 class NeoStore:
@@ -24,7 +19,8 @@ class NeoStore:
         """
         Method to instantiate the class in an object for the neostore.
 
-        :param neo4j_params: dictionary with Neo4J User, Pwd and Database
+        :param neo4j_params: dictionary with Neo4J User, Pwd and Database. If host is not default localhost, it also
+        needs to be defined in the dictionary.
 
         :return: Object to handle neostore commands.
         """
@@ -44,10 +40,16 @@ class NeoStore:
             'user': neo4j_params['user'],
             'password': neo4j_params["password"],
         }
+        try:
+            host = neo4j_params["host"]
+            neo4j_config['host'] = host
+        except KeyError:
+            host = "localhost"
         # Connect to Graph
         graph = Graph(**neo4j_config)
         # Check that we are connected to the expected Neo4J Store - to avoid accidents...
-        dbname = DBMS().database_name
+        uri = "bolt://{host}:7687/".format(host=host)
+        dbname = DBMS(uri).database_name
         if dbname != neo4j_params['db']:    # pragma: no cover
             logging.fatal("Connected to Neo4J database {d}, but expected to be connected to {n}"
                           .format(d=dbname, n=neo4j_params['db']))

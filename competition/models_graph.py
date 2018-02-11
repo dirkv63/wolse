@@ -1,12 +1,9 @@
 import datetime
-# import logging
 import os
 from . import lm
-# from . import ns
 from competition import neostore
 from flask import current_app
 from flask_login import UserMixin
-# from lib import my_env
 from py2neo.types import *
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -16,6 +13,9 @@ neo4j_params = dict(
     password=os.environ.get('Neo4J_Pwd'),
     db=os.environ.get('Neo4J_Db')
 )
+host=os.environ.get("Neo4J_Host")
+if isinstance(host, str):
+    neo4j_params['host'] = host
 ns = neostore.NeoStore(**neo4j_params)
 
 # Define Node Labels
