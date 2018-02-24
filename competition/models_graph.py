@@ -7,7 +7,6 @@ from flask_login import UserMixin
 from py2neo.types import *
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# Todo: Get Username / Password from environment settings
 neo4j_params = dict(
     user=os.environ.get('Neo4J_User'),
     password=os.environ.get('Neo4J_Pwd'),
@@ -1144,25 +1143,13 @@ def organization_delete(org_id=None):
 def get_org_id(race_id):
     """
     This method will return the organization ID for a Race ID: Organization has Race.
-    @param race_id: Node ID of the race.
-    @return: Node ID of the organization.
+
+    :param race_id: Node ID of the race.
+
+    :return: Node ID of the organization.
     """
     org_id = ns.get_start_node(end_node_id=race_id, rel_type="has")
     return org_id
-
-
-def get_org_type(org_id):
-    """
-    This method will get the organization Type for this organization. Type can be 'Wedstrijd' or 'Deelname'.
-    @param org_id: Node ID of the Organization.
-    @return: Type of the Organization: Wedstrijd or Deelname, or False in case type could not be found.
-    """
-    org_type_id = ns.get_end_node(start_node_id=org_id, rel_type="type")
-    org_type_node = ns.node(org_type_id)
-    if org_type_node:
-        return org_type_node["name"]
-    else:
-        return False
 
 
 def get_org_type_node(org_type):
@@ -1177,34 +1164,6 @@ def get_org_type_node(org_type):
         "name": org_type
     }
     return ns.get_node("OrgType", **props)
-
-
-def get_race_type_node(racetype):
-    """
-    This method will return the racetype node associated with this racetype.
-    @param racetype: Racetype specifier (Hoofdwedstrijd, Bijwedstrijd, Deelname)
-    @return: Racetype Node, or False if it could not be found.
-    """
-    if racetype in ["Hoofdwedstrijd", "Bijwedstrijd", "Deelname"]:
-        # RaceType defined, so it must be Hoofdwedstrijd.
-        props = {
-            "name": racetype
-        }
-        racetype_node = ns.get_node("RaceType", **props)
-        return racetype_node
-    else:
-        current_app.logger.error("RaceType unknown: {racetype}.".format(racetype=racetype))
-        return False
-
-
-def get_races_for_org(org_id):
-    """
-    This method will return the list of races for an Organization ID: Organization has Race.
-    @param org_id: Node ID of the Organization.
-    @return: List of node IDs of races.
-    """
-    races = ns.get_end_nodes(start_node_id=org_id, rel_type="has")
-    return races
 
 
 def get_race_list_attribs(org_id):
@@ -1421,24 +1380,6 @@ def person_list():
     return persons_sorted
 
 
-def person4participant(part_id):
-    """
-    This method will get the person name from a participant ID. First it will convert the participant ID to a
-    participant node. Then it gets the (reverse) relation ('is') from participant to person.
-    Finally it will return the id and the name of the person in a hash.
-    @param part_id: Node ID of the participant.
-    @return: Person dictionary with name and nid, or False if no person found for participant id nid.
-    """
-    person_nid = ns.get_start_node(end_node_id=part_id, rel_type="is")
-    if person_nid:
-        person_node = ns.node(person_nid)
-        person_name = person_node["name"]
-        return dict(name=person_name, nid=person_nid)
-    else:
-        current_app.logger.error("Cannot find person for participant node nid: {part_id}".format(part_id=part_id))
-        return False
-
-
 def get_cat4part(part_nid):
     """
     This method will return category nid for the participant.
@@ -1593,43 +1534,6 @@ def points_short(pos):
     if points < 1:
         points = 1
     return points
-
-
-def points_bijwedstrijd(race_id):
-    """
-    This method will assign points to participants in a race for type 'Bijwedstrijd'. It will add 'bijwedstrijd' points
-    to every participant. Participant list is sufficient, sequence list is not required. But this function does not
-    exist (I think).
-    :param race_id:
-    :return:
-    """
-    # Get min value from hoofdwedstrijd.
-    # If found, go to next value (45,40,39, ...)
-    # If not found, assign 50.
-    # Count number of Category participants in the Hoofdwedstrijd. Points for participant is next available one, after
-    # all participants on main race have been calculated.
-    # This allows to calculate points for the participant.
-    main_race_id = ns.get_main_race_id(race_id)
-    d_parts = ns.get_nr_participants(race_id=main_race_id, cat="Dames")
-    m_parts = ns.get_nr_participants(race_id=main_race_id, cat="Heren")
-    d_rel_pos = d_parts + 1
-    m_rel_pos = m_parts + 1
-    d_points = points_race(d_rel_pos)
-    m_points = points_race(m_rel_pos)
-    # Now add points for everyone in the race.
-    node_list = ns.get_participant_seq_list(race_id)
-    if node_list:
-        for part in node_list:
-            mf = get_cat4part(part["nid"])
-            if mf == "Heren":
-                points = m_points
-                rel_pos = m_rel_pos
-            else:
-                points = d_points
-                rel_pos = d_rel_pos
-            props = dict(nid=part["nid"], points=points, rel_pos=rel_pos)
-            ns.node_set_attribs(**props)
-    return
 
 
 def points_sum(point_list):
@@ -1834,75 +1738,12 @@ def participant_first_id(race_id):
         return False
 
 
-def next_participant(race_id):
-    """
-    This method will get the list of potential next participants. This is the list of all persons minus the people that
-    have been selected already in this race. Also all people that have been selected in other races for this
-    organization will no longer be available for selection.
-
-    :param race_id:
-
-    :return: List of the Person objects (Person nid and Person name) that can be selected as participant in the race.
-    """
-    # Todo: extend to participants that have been selected for this organization (one participation per race per org.)
-    # Get Organization for this race
-    this_race = Race(race_id=race_id)
-    org_id = this_race.get_org_id()
-    this_org = Organization(org_id=org_id)
-    participants = this_org.get_participants()
-    persons = ns.get_nodes("Person")
-    next_participants = [part for part in persons if part not in participants]
-    next_part_dict = [(x['nid'], x['name']) for x in next_participants]
-    return next_part_dict
-
-
-def racetype_list():
-    """
-    This method will get all the race types. It will return them as a list of tuples with race type ID and race type
-    name.
-    @return:
-    """
-    race_nodes = ns.get_nodes("RaceType")
-    race_types = []
-    for node in race_nodes:
-        race_tuple = (node["nid"], node["name"])
-        race_types.append(race_tuple)
-    return race_types
-
-
-def relations(node_id):
-    """
-    This method will return True if the node with node_id has relations, False otherwise.
-    @param node_id:
-    @return:
-    """
-    return ns.relations(node_id)
-
-
 def remove_node_force(node_id):
     """
     This function will remove the node with node ID node_id, including relations with the node.
-    @param node_id:
-    @return: True if node is deleted, False otherwise
+
+    :param node_id:
+
+    :return: True if node is deleted, False otherwise
     """
     return ns.remove_node_force(node_id)
-
-
-def set_race_type(race_id=None, race_type_node=None):
-    """
-    Check if old node type is defined. If so, remove the link.
-    Then add new link.
-
-    :param race_id: Node ID for the race
-
-    :param race_type_node:
-
-    :return:
-    """
-    race_node = ns.node(race_id)
-    # Check if there is a link now.
-    curr_race_type_id = ns.get_end_node(race_id, "type")
-    if curr_race_type_id:
-        ns.remove_relation(race_id, curr_race_type_id, "type")
-    ns.create_relation(from_node=race_node, to_node=race_type_node, rel="type")
-    return

@@ -937,7 +937,8 @@ class NeoStore:
         node = selected.first()
         return node
 
-    def node_id(self, node_obj):
+    @staticmethod
+    def node_id(node_obj):
         """
         py2neo 3.1.2 doesn't have a method to get the ID from a node.
         Not sure how to get an ID from a node...
@@ -1185,9 +1186,12 @@ def validate_node(node, label):
     """
     BE CAREFUL: has_label does not always work for unknown reason.
     This function will check if a node is of a specific type, so it will check if the node has the label.
-    @param node: Node to check
-    @param label: Label that needs to be in the node.
-    @return: True, if label is in the node. False for all other reasons (e.g. node is not a node.
+
+    :param node: Node to check
+
+    :param label: Label that needs to be in the node.
+
+    :return: True, if label is in the node. False for all other reasons (e.g. node is not a node.
     """
     if type(node) is Node:
         return node.has_label(label)

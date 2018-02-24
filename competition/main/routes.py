@@ -146,8 +146,10 @@ def person_delete(pers_id):
     """
     This method will get an id for a participant that can be removed. Checks have been done to make sure that there
     are no more connections (relations) with this participant.
-    :param pers_id:
-    :return:
+
+    :param pers_id: NID of the person to be removed
+
+    :return: person_list
     """
     person = mg.Person(pers_id)
     if person.active():
