@@ -94,26 +94,17 @@ class NeoStore:
         self.graph.create(component)
         return component
 
-    def create_node_no_nid(self, *labels, **props):     # pragma: no cover
-        """
-        Function to create node. The function will return the node object.
-        Note that in this case a 'nid' attribute will not be added to the node. This is for restoring a previous dump
-        of this database.
-        @param labels: Labels for the node
-        @param props: Value dictionary with values for the node.
-        @return: Node that has been created.
-        """
-        component = Node(*labels, **props)
-        self.graph.create(component)
-        return component
-
     def create_relation(self, from_node=None, rel=None, to_node=None):
         """
         Function to create relationship between nodes.
-        @param from_node: Start node for the relation
-        @param rel: Relation type
-        @param to_node: End node for the relation
-        @return:
+
+        :param from_node: Start node for the relation
+
+        :param rel: Relation type
+
+        :param to_node: End node for the relation
+
+        :return:
         """
         rel = Relationship(from_node, rel, to_node)
         self.graph.merge(rel)
@@ -124,8 +115,10 @@ class NeoStore:
         This method will clear every date node as specified by label. Label can be Day, Month or Year. The node will be
         deleted if not used anymore. So it can have only one incoming relation: DAY - MONTH or YEAR.
         Therefore find all relations. If there is only one, then the date node can be deleted.
-        @param label: Day, Month or Year
-        @return:
+
+        :param label: Day, Month or Year
+
+        :return:
         """
         logging.info("Clearing all date nodes with label {l}".format(l=label))
         query = """
@@ -155,15 +148,6 @@ class NeoStore:
         self.clear_date_node("Year")
         return
 
-    def clear_store(self):      # pragma: no cover
-        """
-        This method will remove all nodes and relations in a datastore. It should be used during tests only.
-        :return:
-        """
-        query = "MATCH (n) DETACH DELETE n"
-        self.graph.run(query)
-        return
-
     def date_node(self, ds):
         """
         This method will get a datetime.date timestamp and return the associated node. The calendar module will
@@ -186,40 +170,6 @@ class NeoStore:
             self.get_nodes_no_nid()
             return date_node
         else:
-            return False
-
-    def get_end_node(self, start_node_id=None, rel_type=None):
-        """
-        This method will calculate the end node from an start Node ID and a relation type. If relation type is not
-        specified then any relation type will do.
-        The purpose of the function is to find a single end node. If there are multiple end nodes, then a random one
-        is returned and an error message will be displayed.
-
-        :param start_node_id: Node ID of the start node.
-
-        :param rel_type: Relation type
-
-        :return: Node ID (integer) of the end Node, or False.
-        """
-        # First get Node from end node ID
-        start_node = self.node(start_node_id)
-        if start_node:
-            # Then get relation to end node.
-            try:
-                rel = next(item for item in self.graph.match(start_node=start_node, rel_type=rel_type))
-            except StopIteration:
-                logging.warning("No end node found for start node ID: {nid} and relation: {rel}"
-                                .format(nid=start_node_id, rel=rel_type))
-                return False
-            else:
-                # Check if there are more elements in the iterator.
-                if len([item for item in self.graph.match(start_node=start_node, rel_type=rel_type)]) > 1:
-                    logging.warning("More than one end node found for start node ID {nid} and relation {rel},"
-                                    " returning first".format(nid=start_node_id, rel=rel_type))
-                end_node_id = self.node_id(rel.end_node())
-                return end_node_id
-        else:
-            logging.error("Non-existing start node ID: {start_node_id}".format(start_node_id=start_node_id))
             return False
 
     def get_endnode(self, start_node=None, rel_type=None):
@@ -299,29 +249,6 @@ class NeoStore:
             res.append(rec["cat"])
         return res
 
-    def get_end_nodes(self, start_node_id=None, rel_type=None):
-        """
-        This method will calculate all end nodes from a start Node ID and a relation type. If relation type is not
-        specified then any relation type will do.
-        The purpose of the function is to find all end nodes.
-        @param start_node_id: Node ID of the start node.
-        @param rel_type: Relation type
-        @return: List with Node IDs (integers) of the end Nodes, or False.
-        """
-        # First get Node from end node ID
-        start_node = self.node(start_node_id)
-        if start_node:
-            # Then get relation to end node.
-            node_list = [self.node_id(rel.end_node())
-                         for rel in self.graph.match(start_node=start_node, rel_type=rel_type)]
-            # Convert to set to remove duplicates
-            node_set = set(node_list)
-            # Then return the list
-            return list(node_set)
-        else:
-            logging.error("Non-existing start node ID: {start_node_id}".format(start_node_id=start_node_id))
-            return False
-
     def get_location_nodes(self):
         """
         This function returns the location nodes in sequence
@@ -335,45 +262,6 @@ class NeoStore:
             rec = cursor.current()
             res.append(rec["n"])
         return res
-
-    def get_main_race_id(self, race_id):
-        """
-        This function will find the main race associated with a race_id. Race_id needs to be the nid of a
-        'Bijwedstrijd'. There is no verification if nid is from race_id, type Bijwedstrijd.
-        @param race_id: nid of the Bijwedstrijd
-        @return: nid of the Hoofdwedstrijd.
-        """
-        query = """
-            MATCH (n:Race {nid:{race_nid}})<-[:has]-(:Organization)-[:has]->(r:Race),
-                  (r)-[:type]->(t:RaceType {name:'Hoofdwedstrijd'})
-            RETURN r.nid as nid
-            """
-        res = self.graph.run(query, race_nid=race_id)
-        try:
-            rec = res.next()
-        except StopIteration:
-            return False
-        return rec["nid"]
-
-    def get_nr_participants(self, race_id, cat):
-        """
-        This function will calculate the number of participants of category cat in race with nid race_id. It is used
-        to calculate points for participants in 'Bijwedstrijd'.
-        :param race_id: nid of the race
-        :param cat: Category name
-        :return: Number of participants. 0 is a valid response.
-        """
-        query = """
-            MATCH (n:Race {nid:{race_nid}})<-[:participates]-(:Participant)<-[:is]-(p:Person),
-                  (p)-[:mf]->(c:MF {name:{cat}})
-            RETURN count(p) as cnt
-        """
-        res = self.graph.run(query, race_nid=race_id, cat=cat)
-        try:
-            rec = res.next()
-        except StopIteration:
-            return False
-        return rec["cnt"]
 
     def get_node(self, *labels, **props):
         """
@@ -425,42 +313,6 @@ class NeoStore:
             self.set_node_nid(node_id=rec["node_id"])
             cnt += 1
         return cnt
-
-    def get_organization(self, **org_dict):
-        """
-        This method searches for the organization based on organization name, location nid and datestamp. If found,
-        then organization attributes will be set using method set_organization. If not found, 'False' will be returned.
-
-        :param org_dict: New set of properties for the node. These properties are: name, location nid, datestamp and
-         org_type. Datestamp needs to be in format 'YYYY-MM-DD', this is the key for date as generated by the calendar
-         method.
-
-        :return: True if organization is found, False otherwise.
-        """
-        query = """
-        MATCH (day:Day {key: {datestamp}})<-[:On]-(org:Organization {name: {name}}),
-              (org)-[:In]->(loc:Location {nid: {location}})
-        RETURN org
-        """
-        if not isinstance(org_dict["datestamp"], str):
-            org_dict["datestamp"] = org_dict["datestamp"].strftime("%Y-%m-%d")
-        cursor = self.graph.run(query, name=org_dict["name"], location=org_dict["location"],
-                                datestamp=org_dict["datestamp"])
-        org_list = nodelist_from_cursor(cursor)
-        if len(org_list) == 0:
-            # No organization found on this date for this location
-            return False
-        elif len(org_list) == 1:
-            # Organization node found, return ID of the organization node
-            org_node = org_list.pop()
-            return org_node["nid"]
-        else:
-            tot_len = len(org_list)
-            logging.error("Expected to find 0 or 1 organization, found {tot_len} (Organization: {name}, "
-                          "Location: {loc}, Date: {date}"
-                          .format(tot_len=tot_len, name=org_dict["name"], loc=org_dict["location"],
-                                  date=org_dict["datestamp"]))
-            return False
 
     def get_organization_list(self):
         """
@@ -633,34 +485,6 @@ class NeoStore:
         res = self.graph.data(query, mf=mf, cat=cat, orgtype=orgtype)
         return DataFrame(res)
 
-    def get_race_in_org(self, org_id, racetype_id, name):
-        """
-        This function will find a race of a specific type in an organization. It will return the race attributes if a
-        race has been found, false otherwise.
-
-        :param org_id: nid of the Organization node.
-
-        :param racetype_id: nid of the RaceType node.
-
-        :param name: label (name) of the race (e.g. 10 km).
-
-        :return: tuple with race nid and organization name, or False if race not found.
-        """
-        query = """
-        MATCH (org:Organization)-->(race:Race)-->(racetype:RaceType)
-        WHERE org.nid='{org_id}'
-          AND racetype.nid='{racetype}'
-          AND race.name='{name}'
-        RETURN race.nid as race_nid, org.name as org_name
-        """.format(org_id=org_id, racetype=racetype_id, name=name)
-        race_cursor = self.graph.run(query)
-        try:
-            race_data = next(race_cursor)
-        except StopIteration:
-            return False
-        else:
-            return race_data["race_nid"], race_data["org_name"]
-
     def get_race_list(self, org_id):
         """
         This function will get an organization nid and return the Races associated with the Organization.
@@ -742,16 +566,6 @@ class NeoStore:
         res = self.graph.run(query).data()[0]
         return res['seq']
 
-    def get_relations(self):
-        """
-        This method will return all relations in the database as a list of dictionaries with keys from_nid, rel, to_nid.
-        @return: cursor with every possible relation. A cursor is an generator, so only a single pass in a for-loop is
-         possible. Access the fields from_nid, rel and to_nid as dictionary items.
-        """
-        query = "match (n)-[r]->(m) return n.nid as from_nid, type(r) as rel, m.nid as to_nid"
-        res = self.graph.run(query)
-        return res
-
     def get_start_node(self, end_node_id=None, rel_type=None):
         """
         This method will calculate the start node from an end Node ID and a relation type. If relation type is not
@@ -812,30 +626,6 @@ class NeoStore:
                                 " returning first".format(nid=end_node["nid"], rel=rel_type))
             return rel.start_node()
 
-    def get_start_nodes(self, end_node_id=None, rel_type=None):
-        """
-        This method will calculate all start nodes from an end Node ID and a relation type. If relation type is not
-        specified then any relation type will do.
-        The purpose of the function is to find all start nodes.
-
-        :param end_node_id: Node nid of the end node.
-
-        :param rel_type: Relation type
-
-        :return: List with Node IDs (integers) of the start Node, or False.
-        """
-        # Todo: try to phase out this method in favour of get_startnode, a method that works on nodes instead of IDs.
-        # First get Node from end node ID
-        end_node = self.node(end_node_id)
-        if end_node:
-            # Then get relation to end node.
-            node_list = [self.node_id(rel.start_node())
-                         for rel in self.graph.match(end_node=end_node, rel_type=rel_type)]
-            return node_list
-        else:
-            logging.error("Non-existing end node ID: {end_node_id}".format(end_node_id=end_node_id))
-            return False
-
     def get_startnodes(self, end_node=None, rel_type=None):
         """
         This method will calculate all start nodes from an end Node and a relation type. If relation type is not
@@ -858,26 +648,6 @@ class NeoStore:
         else:
             logging.error("Attribute not type Node (instead type {t})".format(t=type(end_node)))
             return False
-
-    def get_wedstrijd_type(self, org_id, racetype):
-        """
-        This query will find if organization has races of type racetype. It will return the number of races (True)
-        in case that there are races of type racetype, False otherwise
-        @param org_id: NID of the organization
-        @param racetype:
-        @return: Number of races for this type (True), or False if no races.
-        """
-        query = """
-        MATCH (org:Organization)-[:has]->(race:Race)-[:type]->(rt:RaceType)
-        WHERE org.nid='{org_id}'
-          AND rt.name='{racetype}'
-        RETURN org, race, rt
-        """.format(org_id=org_id, racetype=racetype)
-        res = DataFrame(self.graph.run(query).data())
-        if res.empty:
-            return False
-        else:
-            return len(res.index)
 
     def init_graph(self):
         """
@@ -1075,28 +845,6 @@ class NeoStore:
         else:
             current_app.logger.error("Node expected, but got type {t} Input: {n}".format(t=type(node), n=node))
             return False
-
-    def remove_node2br(self, nid):
-        """
-        This method will remove node with ID node_id. Nodes can be removed only if there are no relations attached to
-        the node.
-
-        :param nid:
-
-        :return: True if node is deleted, False otherwise
-        """
-        # Todo: This method needs to be replaced by remove_node, which accepts a node (instead of a nid) as argument.
-        obj_node = self.node(nid)
-        if not obj_node:
-            return False
-        elif self.relations(nid):
-            logging.error("Request to delete node nid {node_id}, but relations found. Node not deleted"
-                          .format(node_id=nid))
-            return False
-        else:
-            query = "MATCH (n) WHERE n.nid='{nid}' DELETE n".format(nid=nid)
-            self.graph.run(query)
-            return True
 
     def remove_node_force(self, nid):
         """
