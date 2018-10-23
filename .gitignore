@@ -12,3 +12,4 @@
 *.sqlite3
 *.pyc
 config.py
+properties/*.ini

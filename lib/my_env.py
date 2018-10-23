@@ -4,11 +4,61 @@ setup and initializing the config file.
 Also other utilities find their home here.
 """
 
+import configparser
 import datetime
 import logging
 import logging.handlers
 import os
 import platform
+import sys
+
+
+def init_env(projectname, filename):
+    """
+    This function will initialize the environment: Find and return handle to config file and set-up logging.
+    :param projectname: Name that will be used to find ini file in properties subdirectory.
+    :param filename: Filename (__file__) of the calling script (for logfile).
+    :return: config handle
+    """
+    projectname = projectname
+    modulename = get_modulename(filename)
+    config = get_inifile(projectname)
+    my_log = init_loghandler(modulename, config["Main"]["logdir"], config["Main"]["loglevel"])
+    my_log.info('Start Application')
+    return config
+
+
+def get_inifile(projectname):
+    """
+    Read Project configuration ini file in subdirectory properties. Config ini filename is the projectname.
+    The ini file is located in the properties module, which is sibling of the lib module.
+    :param projectname: Name of the project.
+    :return: Object reference to the inifile.
+    """
+    # Use Project Name as ini file.
+    # TODO: review procedure to get directory name instead of relative properties/ path.
+    if getattr(sys, 'frozen', False):
+        # Running Frozen (pyinstaller executable)
+        configfile = projectname + ".ini"
+    else:
+        # Running Live
+        # properties directory is sibling of lib directory.
+        (filepath_lib, _) = os.path.split(__file__)
+        (filepath, _) = os.path.split(filepath_lib)
+        # configfile = filepath + "/properties/" + projectname + ".ini"
+        configfile = os.path.join(filepath, 'properties', "{p}.ini".format(p=projectname))
+    ini_config = configparser.ConfigParser()
+    try:
+        f = open(configfile)
+        ini_config.read_file(f)
+        f.close()
+    except FileNotFoundError:
+        e = sys.exc_info()[1]
+        ec = sys.exc_info()[0]
+        log_msg = "Read Inifile not successful: %s (%s)"
+        print(log_msg % (e, ec))
+        sys.exit(1)
+    return ini_config
 
 
 def get_modulename(scriptname):
