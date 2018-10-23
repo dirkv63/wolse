@@ -14,4 +14,5 @@ for process in psutil.process_iter():
     if process.cmdline() == [cmd, script]:
         process.terminate()
         logging.info("Found and stopped process {script}".format(script=script))
+# Also stop neo4j
 logging.info("End Application")
