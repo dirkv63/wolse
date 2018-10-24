@@ -9,11 +9,13 @@ from lib import my_env
 
 cfg = my_env.init_env("wolse", __file__)
 
-cmd = os.path.join(cfg["Graph"]["path"], cfg["Graph"]["adm"])
+cmd = os.path.join(cfg["Graph"]["path"], 'bin', cfg["Graph"]["adm"])
 db = cfg["Graph"]["db"]
 dbname = db.split(".")[0]
 dumpname = "{dbname}.dump".format(dbname=dbname)
 dumpffp = os.path.join(cfg["Graph"]["dumpdir"], dumpname)
+if os.path.isfile(dumpffp):
+    os.remove(dumpffp)
 args = [cmd, "dump", "--database={db}".format(db=db), "--to={dumpffp}".format(dumpffp=dumpffp)]
 
 module = my_env.get_modulename(__file__)
@@ -30,3 +32,9 @@ else:
     logging.info("No error messages returned, see {sof}!".format(sof=sof))
 se.close()
 so.close()
+
+# After dump also remove transaction log files
+dbdir = os.path.join(cfg["Graph"]["path"], "data/databases", db)
+filelist = [file for file in os.listdir(dbdir) if 'transaction' in file]
+for file in filelist:
+    print("Ready to remove {ffp}".format(ffp=os.path.join(dbdir, file)))
