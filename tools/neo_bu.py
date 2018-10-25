@@ -37,4 +37,6 @@ so.close()
 dbdir = os.path.join(cfg["Graph"]["path"], "data/databases", db)
 filelist = [file for file in os.listdir(dbdir) if 'transaction' in file]
 for file in filelist:
-    print("Ready to remove {ffp}".format(ffp=os.path.join(dbdir, file)))
+        ffn = os.path.join(dbdir, file)
+        os.remove(ffn)
+        logging.info("Remove file {ffn}".format(ffn=ffn))
