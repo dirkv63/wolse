@@ -19,7 +19,7 @@ for file in filelist:
         logging.info("Remove file {ffn}".format(ffn=ffn))
 
 # Remove previous dump file if it still exists
-dbname = db.split(".")[0]c
+dbname = db.split(".")[0]
 dumpname = "{dbname}.dump".format(dbname=dbname)
 dumpffp = os.path.join(cfg["Graph"]["dumpdir"], dumpname)
 if os.path.isfile(dumpffp):
