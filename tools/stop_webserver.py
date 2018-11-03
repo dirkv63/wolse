@@ -11,8 +11,8 @@ cfg = my_env.init_env("wolse", __file__)
 cmd = cfg["Process"]["cmd"]
 script = cfg["Process"]["script"]
 for process in psutil.process_iter():
-    if process.cmdline() == [cmd, script]:
+    cmdlist = process.cmdline()
+    if (len(cmdlist > 1)) and (cmd in cmdlist[0]) and (script in cmdlist[1]):
         process.terminate()
-        logging.info("Found and stopped process {script}".format(script=script))
-# Also stop neo4j
+        logging.info("Found and stopped process {script} in command {cmdlist}".format(script=script, cmdlist=cmdlist))
 logging.info("End Application")
