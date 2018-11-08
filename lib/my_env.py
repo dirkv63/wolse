@@ -117,7 +117,7 @@ def init_loghandler(scriptname, logdir, loglevel):
     # Add Formatter to Rotating File Handler
     rfh.setFormatter(formatter_file)
     # Add Handler to the logger
-    logger.addHandler(ch)
+    # logger.addHandler(ch)
     logger.addHandler(rfh)
     return logger
 
