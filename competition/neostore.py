@@ -2,58 +2,52 @@
 This class consolidates functions related to the neo4J datastore.
 """
 
-import logging
-import sys
+import os
 import uuid
+from competition.lib.neostructure import *
 from datetime import datetime, date
 from flask import current_app
 from pandas import DataFrame
-from py2neo import Graph, Node, Relationship, NodeSelector
-from py2neo.database import DBMS
-from py2neo.ext.calendar import GregorianCalendar
+from py2neo import Database, Graph, Node, Relationship, NodeMatcher, RelationshipMatch
 
 
+# Todo: Review on IF True/False, test on ininstance() instead
 class NeoStore:
 
-    def __init__(self, **neo4j_params):
+    def __init__(self):
         """
         Method to instantiate the class in an object for the neostore.
 
-        :param neo4j_params: dictionary with Neo4J User, Pwd and Database. If host is not default localhost, it also
-        needs to be defined in the dictionary.
-
         :return: Object to handle neostore commands.
         """
-        self.graph = self.connect2db(**neo4j_params)
-        self.calendar = GregorianCalendar(self.graph)
-        self.selector = NodeSelector(self.graph)
+        self.graph = self.connect2db()
+        self.nodematcher = NodeMatcher(self.graph)
         return
 
     @staticmethod
-    def connect2db(**neo4j_params):
+    def connect2db():
         """
         Internal method to create a database connection. This method is called during object initialization.
+        Database initialization variables need to be set in environment.
 
         :return: Database handle and cursor for the database.
         """
         neo4j_config = {
-            'user': neo4j_params['user'],
-            'password': neo4j_params["password"],
+            'user': os.environ["NEO4J_USER"],
+            'password': os.environ["NEO4J_PWD"]
         }
-        try:
-            host = neo4j_params["host"]
+        if os.environ.get("NEO4J_HOST"):
+            host = os.environ["NEO4J_HOST"]
             neo4j_config['host'] = host
-        except KeyError:
-            host = "localhost"
+        # Check that Neo4J is running the expected Neo4J Store - to avoid accidents...
+        connected_db = Database(**neo4j_config)
+        if connected_db.config["dbms.active_database"] != os.environ['NEO4J_DB']:
+            msg = "Connected to Neo4J database {d}, but expected to be connected to {n}"\
+                .format(d=connected_db.config["dbms.active_database"], n=os.environ['NEO4J_DB'])
+            current_app.logger.fatal(msg)
+            raise SystemExit()
         # Connect to Graph
         graph = Graph(**neo4j_config)
-        # Check that we are connected to the expected Neo4J Store - to avoid accidents...
-        uri = "bolt://{host}:7687/".format(host=host)
-        dbname = DBMS(uri).database_name
-        if dbname != neo4j_params['db']:    # pragma: no cover
-            logging.fatal("Connected to Neo4J database {d}, but expected to be connected to {n}"
-                          .format(d=dbname, n=neo4j_params['db']))
-            sys.exit(1)
         return graph
 
     def clear_locations(self):
@@ -70,7 +64,7 @@ class NeoStore:
         """
         cursor = self.graph.run(query)
         while cursor.forward():
-            rec = cursor.current()
+            rec = cursor.current
             loc = rec['loc']
             current_app.logger.info("Remove location {city}".format(city=loc['city']))
             self.remove_node(loc)
@@ -83,9 +77,7 @@ class NeoStore:
         solution cause there seems to be no other way to extract the node ID from a node.
 
         :param labels: Labels for the node
-
         :param props: Value dictionary with values for the node.
-
         :return: Node that has been created.
         """
         props['nid'] = str(uuid.uuid4())
@@ -99,11 +91,8 @@ class NeoStore:
         Function to create relationship between nodes.
 
         :param from_node: Start node for the relation
-
         :param rel: Relation type
-
         :param to_node: End node for the relation
-
         :return:
         """
         rel = Relationship(from_node, rel, to_node)
@@ -117,10 +106,9 @@ class NeoStore:
         Therefore find all relations. If there is only one, then the date node can be deleted.
 
         :param label: Day, Month or Year
-
         :return:
         """
-        logging.info("Clearing all date nodes with label {l}".format(l=label))
+        current_app.logger.info("Clearing all date nodes with label {lbl}".format(lbl=label))
         query = """
             MATCH (n:{label})-[rel]-()
             WITH n, count(rel) as rel_cnt
@@ -154,10 +142,9 @@ class NeoStore:
         ensure that the node is created if required.
 
         :param ds: datetime.date representation of the date, or Calendar key 'YYYY-MM-DD'.
-
         :return: node associated with the date, of False (ds could not be formatted as a date object).
         """
-        # If date format is string, convert to datetime object
+        # If date format is string, make sure it is a valid date.
         if isinstance(ds, str):
             try:
                 ds = datetime.strptime(ds, '%Y-%m-%d').date()
@@ -165,9 +152,13 @@ class NeoStore:
                 current_app.logger.error("Trying to set date {ds} but got a value error".format(ds=ds))
                 return False
         if isinstance(ds, date):
-            date_node = self.calendar.date(ds.year, ds.month, ds.day).day   # Get Date (day) node
-            # Check if a new node has been created and nid is set
-            self.get_nodes_no_nid()
+            props = dict(
+                key=ds.strftime('%Y-%m-%d')
+            )
+            lbl = lbl_day
+            date_node = self.get_node(lbl, **props)
+            if not date_node:
+                date_node = self.create_node(lbl, **props)
             return date_node
         else:
             return False
@@ -180,25 +171,21 @@ class NeoStore:
         is returned and an error message will be displayed.
 
         :param start_node: Start node.
-
         :param rel_type: Relation type
-
         :return: End Node, or False.
         """
-        # First get Node from end node ID
-        try:
-            rel = next(item for item in self.graph.match(start_node=start_node, rel_type=rel_type))
-        except StopIteration:
-            logging.warning("No end node found for start node ID: {nid} and relation: {rel}"
-                            .format(nid=start_node["nid"], rel=rel_type))
+        if not isinstance(start_node, Node):
+            current_app.logger.error("Attribute not type Node (instead type {t})".format(t=type(start_node)))
             return False
-        else:
-            # Check if there are more elements in the iterator.
-            if len([item for item in self.graph.match(start_node=start_node, rel_type=rel_type)]) > 1:
-                logging.warning("More than one end node found for start node ID {nid} and relation {rel},"
-                                " returning first".format(nid=start_node["nid"], rel=rel_type))
-            end_node = rel.end_node()
-            return end_node
+        rels = RelationshipMatch(self.graph, (start_node, None), r_type=rel_type)
+        if rels.__len__() == 0:
+            current_app.logger.warning("No end node found for start node ID: {nid} and relation: {rel}"
+                                       .format(nid=start_node["nid"], rel=rel_type))
+            return False
+        elif rels.__len__() > 1:
+            current_app.logger.warning("More than one end node found for start node ID {nid} and relation {rel},"
+                                       " returning first".format(nid=start_node["nid"], rel=rel_type))
+        return rels.first().end_node
 
     def get_endnodes(self, start_node=None, rel_type=None):
         """
@@ -207,16 +194,17 @@ class NeoStore:
         The purpose of the function is to find all end nodes.
 
         :param start_node: Start node.
-
         :param rel_type: Relation type
-
         :return: List with End Nodes.
         """
-        node_list = [rel.end_node()
-                     for rel in self.graph.match(start_node=start_node, rel_type=rel_type)]
-        # Convert to set to remove duplicates
+        if not isinstance(start_node, Node):
+            current_app.logger.error("Attribute not type Node (instead type {t})".format(t=type(start_node)))
+            return False
+        node_list = [rel.end_node
+                     for rel in RelationshipMatch(self.graph, (start_node, None), r_type=rel_type)]
+        # Convert to set to remove duplicate end nodes
         node_set = set(node_list)
-        # Then return the list
+        # Then return the result as a list
         return list(node_set)
 
     def get_cat4part(self, part_nid):
@@ -224,7 +212,6 @@ class NeoStore:
         This method will return category NID for the participant.
 
         :param part_nid: Nid of the participant node.
-
         :return: Category NID, or False if no category could be found.
         """
         query = "MATCH (n:Participant {nid:{p}})<-[:is]-()-[:inCategory]->(c:Category) RETURN c.nid as nid"
@@ -245,8 +232,7 @@ class NeoStore:
         query = "MATCH (cat:Category) RETURN cat ORDER BY cat.seq"
         cursor = self.graph.run(query)
         while cursor.forward():
-            rec = cursor.current()
-            res.append(rec["cat"])
+            res.append(cursor.current["cat"])
         return res
 
     def get_location_nodes(self):
@@ -259,7 +245,7 @@ class NeoStore:
         query = "MATCH (n:Location) RETURN n ORDER BY n.city"
         cursor = self.graph.run(query)
         while cursor.forward():
-            rec = cursor.current()
+            rec = cursor.current
             res.append(rec["n"])
         return res
 
@@ -267,33 +253,30 @@ class NeoStore:
         """
         This method will select a single (or first) node that have labels and properties
 
-        :param labels:
-
-        :param props:
-
+        :param labels: List of labels that are required for node match.
+        :param props: Property dictionary required to match.
         :return: node that fulfills the criteria, or False if there is no node
         """
         nodes = self.get_nodes(*labels, **props)
         if not nodes:
-            current_app.logger.info("Expected 1 node for label {l} and props {p}, found none.".format(l=labels, p=props))
+            current_app.logger.debug("Looking for 1 node for label {lbl} and props {p}, found none."
+                                     .format(lbl=labels, p=props))
             return False
         elif len(nodes) > 1:
-            logging.error("Expected 1 node for label {l} and props {p}, found many {m}."
-                          .format(l=labels, p=props, m=len(nodes)))
+            current_app.logger.error("Expected 1 node for label {lbl} and props {p}, found many {m}."
+                                     .format(lbl=labels, p=props, m=len(nodes)))
         return nodes[0]
 
     def get_nodes(self, *labels, **props):
         """
         This method will select all nodes that have labels and properties
 
-        :param labels:
-
-        :param props:
-
+        :param labels: List of labels that are required for node match
+        :param props: Property dictionary required to match.
         :return: list of nodes that fulfill the criteria, or False if no nodes are found.
         """
-        nodes = self.selector.select(*labels, **props)
-        nodelist = list(nodes)
+        nodes = self.nodematcher.match(*labels, **props)
+        nodelist = [node for node in nodes]
         if len(nodelist) == 0:
             # No nodes found that fulfil the criteria
             return False
@@ -302,9 +285,10 @@ class NeoStore:
 
     def get_nodes_no_nid(self):
         """
-        This method will select all nodes that have no nid. These should be limited to Calendar nodes. A nid will be
-        added since this is used as unique reference for the node in relations
-        @return: count of number of nodes that have been updated.
+        This method will select all nodes that have no nid. A nid will be added since this is used as unique reference
+        for the node in relations.
+
+        :return: count of number of nodes that have been updated.
         """
         query = "MATCH (n) WHERE NOT EXISTS (n.nid) RETURN id(n) as node_id"
         res = self.graph.run(query)
@@ -338,7 +322,6 @@ class NeoStore:
         This method will return a list of people that participate in a race for this organization.
 
         :param org_id: Nid of the organization
-
         :return:
         """
         query = """
@@ -352,13 +335,12 @@ class NeoStore:
     def get_next_parts_for_race(self, race_id):
         """
         This method will get the list of people that can be the next participant of the race. So they are in the range
-        of the race, but not yet seleccted as a participant.
+        of the race, but not yet selected as a participant in this race or another race for this organization (e.g.
+        participant for the short cross will not participate in the long cross)..
 
         :param race_id: Nid of the race.
-
         :return: Person node list for potential participants.
         """
-        #  Todo: Next participant should not occur anywhere in the organization.
         query = """
             MATCH (org:Organization)-[:has]->(race:Race)-[:forCategory]->(cat:Category),
                 (race)-[:forMF]-(mf:MF),
@@ -377,7 +359,6 @@ class NeoStore:
         categories and required MF.
 
         :param race_id:
-
         :return:
         """
         query = """
@@ -393,19 +374,18 @@ class NeoStore:
 
     def get_persons_in_organization(self, org_name):
         """
-        This method will get the person nids for the participants in an organization. This can be used to do the special
+        This method will get the person nid for the participants in an organization. This can be used to do the special
         point calculation, e.g. +3 points for PK, +10 points for BK, ...
 
         :param org_name: Name of the organization
-
-        :return: list of person nids that participate in the organization
+        :return: list of person nid that participate in the organization
         """
         query = """
             MATCH (person:Person)-[:is]->(part:Participant)-[:participates]->(race:Race),
             (race)<-[:has]-(org {name: {org_name}})
             RETURN person.nid as person_nid
         """
-        res = self.graph.data(query, org_name=org_name)
+        res = self.graph.run(query, org_name=org_name).data()
         person_list = []
         for rec in res:
             person_list.append(rec["person_nid"])
@@ -417,9 +397,7 @@ class NeoStore:
         participate in the race according to current information in the database.
 
         :param pers_id:
-
         :param race_id:
-
         :return: participant node, or False
         """
         query = """
@@ -430,8 +408,8 @@ class NeoStore:
         res = self.graph.run(query)
         nodes = nodelist_from_cursor(res)
         if len(nodes) > 1:
-            logging.error("More than one ({nr}) Participant node for Person {pnid} and Race {rnid}"
-                          .format(pnid=pers_id, rnid=race_id, nr=len(nodes)))
+            current_app.logger.error("More than one ({nr}) Participant node for Person {pnid} and Race {rnid}"
+                                     .format(pnid=pers_id, rnid=race_id, nr=len(nodes)))
         elif len(nodes) == 0:
             return False
         return nodes[0]
@@ -441,7 +419,6 @@ class NeoStore:
         This method will return a list of participant nodes in sequence of arrival for a particular race.
 
         :param race_id:
-
         :return: Node list
         """
         query = """
@@ -463,15 +440,12 @@ class NeoStore:
 
     def points_race(self, mf, cat, orgtype):
         """
-        This query will for the specified mf and category collect every participatant and points for the participation
+        This query will for the specified mf and category collect every participant and points for the participation
         for every person in the category.
 
         :param mf: Dames / Heren
-
         :param cat: Category Nid
-
         :param orgtype: Wedstrijd / Deelname
-
         :return: A dataframe with records having the person_nid and points for each participation on every race.
         """
         query = """
@@ -482,21 +456,27 @@ class NeoStore:
                   (org)-[:type]->(orgtype:OrgType {name: {orgtype}})
             RETURN person.nid as person_nid, part.points as points
         """
-        res = self.graph.data(query, mf=mf, cat=cat, orgtype=orgtype)
+        res = self.graph.run(query, mf=mf, cat=cat, orgtype=orgtype).data()
         return DataFrame(res)
+
+    def get_query(self, query):
+        """
+        This method accepts a Cypher query as parameter, runs the query and returns the result as a cursor.
+
+        :param query: Cypher Query to run
+        :return: Result of the Cypher Query as a cursor
+        """
+        return self.graph.run(query)
 
     def get_race_list(self, org_id):
         """
         This function will get an organization nid and return the Races associated with the Organization.
-        The races will be returned as a list of dictionaries with fields race (racename), type (racetype) and nid of the
-        race.
+        The races will be returned as a list of dictionaries with fields race node and mf node.
 
         :param org_id: nid of the Organization.
-
-        :return: List of dictionaries with race, category and mf nodes sorted on category and mf, or empty list which
-        evaluates to False.
+        :return: List of dictionaries with race and mf nodes sorted on category and mf, or empty list which evaluates to
+        False.
         """
-        # Todo: review Query to check if result set can contain nodes instead of fields.
         query = """
             MATCH (org:Organization)-[:has]->(race:Race)-[:forMF]->(mf:MF)
             WHERE org.nid = '{org_id}'
@@ -507,7 +487,7 @@ class NeoStore:
         # Convert result set in an array of nodes
         res_arr = []
         while res.forward():
-            rec = res.current()
+            rec = res.current
             race_nodes = dict(
                 race=rec["race"],
                 mf=rec["mf"]
@@ -517,13 +497,12 @@ class NeoStore:
 
     def get_race4person(self, person_id):
         """
-        This method will get a list of participant information for a  person, sorted on date. The information will be
+        This method will get a list of participant information for a person, sorted on date. The information will be
         provided in a list of dictionaries. The dictionary values are the corresponding node dictionaries.
 
         :param person_id:
-
-        :return: list of Participant (part),race, date, organization (org) and racetype Node dictionaries in date
-        sequence.
+        :return: list of Participant (part),race, date, organization (org) and orgtype and Location (loc) Node
+        dictionaries in date sequence.
         """
         race4person = []
         query = """
@@ -537,7 +516,7 @@ class NeoStore:
         """.format(pers_id=person_id)
         cursor = self.graph.run(query)
         while cursor.forward():
-            rec = cursor.current()
+            rec = cursor.current
             res_dict = dict(part=dict(rec['part']),
                             race=dict(rec['race']),
                             date=dict(rec['day']),
@@ -553,7 +532,6 @@ class NeoStore:
         sequence for the associated categories.
 
         :param race_id: nid of the race.
-
         :return: lowest sequence number of the associated categories.
         """
         query = """
@@ -566,40 +544,6 @@ class NeoStore:
         res = self.graph.run(query).data()[0]
         return res['seq']
 
-    def get_start_node(self, end_node_id=None, rel_type=None):
-        """
-        This method will calculate the start node from an end Node ID and a relation type. If relation type is not
-        specified then any relation type will do.
-        The purpose of the function is to find a single start node. If there are multiple start nodes, then a random
-        one is returned and an error message will be displayed.
-
-        :param end_node_id: Node nid of the end node.
-
-        :param rel_type: Relation type
-
-        :return: Node nid of the start Node, or False.
-        """
-        # Todo: try to phase out this method in favour of get_startnode, a method that works on nodes instead of IDs.
-        # First get Node from end node ID
-        end_node = self.node(end_node_id)
-        if end_node:
-            # Then get relation to end node.
-            try:
-                rel = next(item for item in self.graph.match(end_node=end_node, rel_type=rel_type))
-            except StopIteration:
-                logging.warning("No start node found for end node ID {nid} and relation {rel}"
-                                .format(nid=end_node_id, rel=rel_type))
-            else:
-                # Check if there are more elements in the iterator.
-                if len([item for item in self.graph.match(end_node=end_node, rel_type=rel_type)]) > 1:
-                    logging.warning("More than one start node found for end node ID {nid} and relation {rel},"
-                                    " returning first".format(nid=end_node_id, rel=rel_type))
-                start_node_id = self.node_id(rel.start_node())
-                return start_node_id
-        else:
-            logging.error("Non-existing end node ID: {end_node_id}".format(end_node_id=end_node_id))
-            return False
-
     def get_startnode(self, end_node=None, rel_type=None):
         """
         This method will calculate the start node from an end Node and a relation type. If relation type is not
@@ -608,23 +552,21 @@ class NeoStore:
         one is returned and an error message will be displayed.
 
         :param end_node: End node.
-
         :param rel_type: Relation type
-
         :return: Start Node, or False.
         """
-        try:
-            rel = next(item for item in self.graph.match(end_node=end_node, rel_type=rel_type))
-        except StopIteration:
-            logging.warning("No start node found for end node ID {nid} and relation {rel}"
-                            .format(nid=end_node["nid"], rel=rel_type))
+        if not isinstance(end_node, Node):
+            current_app.logger.error("Attribute not type Node (instead type {t})".format(t=type(end_node)))
             return False
-        else:
-            # Check if there are more elements in the iterator.
-            if len([item for item in self.graph.match(end_node=end_node, rel_type=rel_type)]) > 1:
-                logging.warning("More than one start node found for end node ID {nid} and relation {rel},"
-                                " returning first".format(nid=end_node["nid"], rel=rel_type))
-            return rel.start_node()
+        rels = RelationshipMatch(self.graph, (None, end_node), r_type=rel_type)
+        if rels.__len__() == 0:
+            current_app.logger.warning("No start node found for end node ID: {nid} and relation: {rel}"
+                                       .format(nid=end_node["nid"], rel=rel_type))
+            return False
+        elif rels.__len__() > 1:
+            current_app.logger.warning("More than one start node found for end node ID {nid} and relation {rel},"
+                                       " returning first".format(nid=end_node["nid"], rel=rel_type))
+        return rels.first().start_node
 
     def get_startnodes(self, end_node=None, rel_type=None):
         """
@@ -633,21 +575,18 @@ class NeoStore:
         The purpose of the function is to find all start nodes.
 
         :param end_node: The end node.
-
         :param rel_type: Relation type
-
         :return: List with start nodes, or False.
         """
-        if isinstance(end_node, Node):
-            node_list = [rel.start_node()
-                         for rel in self.graph.match(end_node=end_node, rel_type=rel_type)]
-            # Convert to set to remove duplicates
-            node_set = set(node_list)
-            # Then return the list
-            return list(node_set)
-        else:
-            logging.error("Attribute not type Node (instead type {t})".format(t=type(end_node)))
+        if not isinstance(end_node, Node):
+            current_app.logger.error("Attribute not type Node (instead type {t})".format(t=type(end_node)))
             return False
+        node_list = [rel.start_node
+                     for rel in RelationshipMatch(self.graph, (None, end_node), r_type=rel_type)]
+        # Convert to set to remove duplicate end nodes
+        node_set = set(node_list)
+        # Then return the result as a list
+        return list(node_set)
 
     def init_graph(self):
         """
@@ -666,44 +605,20 @@ class NeoStore:
         for nid_label in nid_labels:
             self.graph.run(stmt.format(nid_label=nid_label))
 
-        # RaceType
-        """
-        hoofdwedstrijd = self.graph.merge_one("RaceType", "name", "Hoofdwedstrijd")
-        bijwedstrijd = self.graph.merge_one("RaceType", "name", "Bijwedstrijd")
-        deelname = self.graph.merge_one("RaceType", "name", "Deelname")
-        hoofdwedstrijd['beschrijving'] = node_params['hoofdwedstrijd']
-        bijwedstrijd['beschrijving'] = node_params['bijwedstrijd']
-        deelname['beschrijving'] = node_params['deelname']
-        # Weight factor is used to sort the types in selection lists.
-        hoofdwedstrijd['weight'] = 10
-        bijwedstrijd['weight'] = 20
-        deelname['weight'] = 100
-        hoofdwedstrijd.push()
-        bijwedstrijd.push()
-        deelname.push()
-        # OrgType
-        wedstrijd = self.graph.merge_one("OrgType", "name", "Wedstrijd")
-        org_deelname = self.graph.merge_one("OrgType", "name", "Deelname")
-        wedstrijd['beschrijving'] = node_params['wedstrijd']
-        org_deelname['beschrijving'] = node_params['o_deelname']
-        wedstrijd.push()
-        org_deelname.push()
-        """
         return
 
     def node(self, nid):
         """
-        This method will get a node ID and return a node, (or false in case no Node can be associated with the ID.
-        The current release of py2neo 3.1.2 throws a IndexError in case a none-existing node ID is requested.)
+        This method will get a node ID and return a node, or false in case no Node can be associated with the ID.
+        Py2neo Release 3.1.2 throws a IndexError in case a none-existing node ID is requested.
 
         Note that since there seems to be no way to extract the Node ID of a node, the nid attribute is used. As a
         consequence, it is not possible to use the node(nid).
 
         :param nid: ID of the node to be found.
-
         :return: Node, or False (None) in case the node could not be found.
         """
-        selected = self.selector.select(nid=nid)
+        selected = self.nodematcher.match(nid=nid)
         node = selected.first()
         return node
 
@@ -717,7 +632,6 @@ class NeoStore:
         For now each node has an attribute nid which contains a random node ID.
 
         :param node_obj: Node object
-
         :return: ID of the node (integer), or False.
         """
         # First check if my object is a node (not sure it is a node, but I am sure it is a sub-graph)
@@ -725,7 +639,7 @@ class NeoStore:
             # OK, my object is a node. Now return the nid attribute
             return node_obj['nid']
         else:
-            logging.error("Node expected, but got object of type {nodetype}".format(nodetype=type(node_obj)))
+            current_app.logger.error("Node expected, but got object of type {nodetype}".format(nodetype=type(node_obj)))
             return False
 
     def node_props(self, nid=None):
@@ -735,62 +649,56 @@ class NeoStore:
         all node attributes, only the attribute that is changed.
 
         :param nid: nid of the node required
-
         :return: Dictionary of the node properties
         """
         my_node = self.node(nid)
         if my_node:
             return dict(my_node)
         else:
-            logging.error("Could not bind ID {node_id} to a node.".format(node_id=nid))
+            current_app.logger.error("Could not bind ID {node_id} to a node.".format(node_id=nid))
             return False
 
     def node_set_attribs(self, **properties):
         """
-        This method will set the node's properties with the properties specified. Modified properties will be
-        updated, new properties will be added and properties not in the dictionary will be left unchanged.
+        This method will set specified properties on the node. Modified properties will be updated and new properties
+        will be added. Properties not in the dictionary will be left unchanged.
         Compare with method node_update, where node property set matches the **properties dictionary.
         nid needs to be part of the properties dictionary.
 
         :param properties: Dictionary of the property set for the node. 'nid' property is mandatory.
-
         :return: True if successful update, False otherwise.
         """
-        #ToDo: merge this procedure with node_update, by adding remove_flag.
-        #ToDo: compare with method Participant.set_props. There seems to be a duplicate.
         try:
             my_node = self.node(properties["nid"])
         except KeyError:
-            logging.error("Attribute 'nid' missing, required in dictionary.")
+            current_app.logger.error("Attribute 'nid' missing, required in dictionary.")
             return False
+        # So I'm sure that nid is still in the property dictionary
         if my_node:
-            curr_props = self.node_props(properties["nid"])
             # Modify properties and add new properties
-            # So I'm sure that nid is still in the property dictionary
             for prop in properties:
                 my_node[prop] = properties[prop]
             # Now push the changes to Neo4J database.
             self.graph.push(my_node)
             return True
         else:
-            logging.error("No node found for NID {nid}".format(nid=properties["nid"]))
+            current_app.logger.error("No node found for NID {nid}".format(nid=properties["nid"]))
             return False
 
     def node_update(self, **properties):
         """
         This method will update the node's properties with the properties specified. Modified properties will be
         updated, new properties will be added and removed properties will be deleted.
-        Compare with method node_set_attribs, where node properties are never removed..
+        Compare with method node_set_attribs, where node properties are never removed.
         nid needs to be part of the properties dictionary.
 
         :param properties: Dictionary of the property set for the node. 'nid' property is mandatory.
-
         :return: Updated node if successful, False otherwise.
         """
         try:
             my_node = self.node(properties["nid"])
         except KeyError:
-            logging.error("Attribute 'nid' missing, required in dictionary.")
+            current_app.logger.error("Attribute 'nid' missing, required in dictionary.")
             return False
         if isinstance(my_node, Node):
             curr_props = self.node_props(properties["nid"])
@@ -807,13 +715,14 @@ class NeoStore:
             self.graph.push(my_node)
             return my_node
         else:
-            logging.error("No node found for NID {nid}".format(nid=properties["nid"]))
+            current_app.logger.error("No node found for NID {nid}".format(nid=properties["nid"]))
             return False
 
     def relations(self, nid):
         """
         This method will check if node with ID has relations. Returns True if there are relations, returns False
         otherwise. Do not use graph.degree, because there seems to be a strange error when running on graphenedb...
+
         :param nid: ID of the object to check relations
         :return: Number of relations - if there are relations, False - there are no relations.
         """
@@ -830,21 +739,20 @@ class NeoStore:
         This method will remove the node on condition that no relations are attached to the node.
 
         :param node: Node to be removed.
-
         :return: True if node is deleted, False otherwise
         """
-        if isinstance(node, Node):
-            if self.graph.degree(node) == 0:
-                self.graph.delete(node)
-                return True
-            else:
-                msg = "Request to delete node nid {node_id}, but {x} relations found. Node not deleted"\
-                    .format(node_id=node["nid"], x=self.graph.degree(node))
-                current_app.logger.warning(msg)
-                return False
-        else:
+        if not isinstance(node, Node):
             current_app.logger.error("Node expected, but got type {t} Input: {n}".format(t=type(node), n=node))
             return False
+        degree = self.relations(node["nid"])
+        if degree:
+            msg = "Request to delete node nid {node_id}, but {x} relations found. Node not deleted"\
+                .format(node_id=node["nid"], x=degree)
+            current_app.logger.warning(msg)
+            return False
+        else:
+            self.graph.delete(node)
+            return True
 
     def remove_node_force(self, nid):
         """
@@ -852,7 +760,6 @@ class NeoStore:
         Note that this needs to use nid instead of node, since graph.delete has a CONSTRAINT on relations.
 
         :param nid: nid of the node
-
         :return:
         """
         query = "MATCH (n) WHERE n.nid='{nid}' DETACH DELETE n".format(nid=nid)
@@ -865,11 +772,8 @@ class NeoStore:
         Relation is of type rel_type.
 
         :param start_nid: Node nid of the start node.
-
         :param end_nid: Node nid of the end node.
-
         :param rel_type: Type of the relation
-
         :return:
         """
         # Todo: this method needs to be replaced by remove_relation_node.
@@ -888,11 +792,8 @@ class NeoStore:
         The goal is to use the
 
         :param start_node:
-
         :param end_node:
-
         :param rel_type:
-
         :return:
         """
         # Todo: rename the method to remove_relation.
@@ -905,6 +806,7 @@ class NeoStore:
     def set_node_nid(self, node_id):
         """
         This method will set a nid for node with node_id. This should be done only for calendar functions.
+
         :param node_id: Neo4J ID of the node
         :return: nothing, nid should be set.
         """
@@ -919,12 +821,11 @@ def nodelist_from_cursor(cursor):
     a query where the cypher return argument is a single node. The function will return the list of unique nodes.
 
     :param cursor: Result of a query with single node per result line.
-
     :return: list of unique nodes, or empty list if there are no nodes.
     """
     node_list = set()
     while cursor.forward():
-        current = cursor.current()
+        current = cursor.current
         (node, ) = current.values()
         node_list.add(node)
     return list(node_list)
@@ -936,9 +837,7 @@ def validate_node(node, label):
     This function will check if a node is of a specific type, so it will check if the node has the label.
 
     :param node: Node to check
-
     :param label: Label that needs to be in the node.
-
     :return: True, if label is in the node. False for all other reasons (e.g. node is not a node.
     """
     if type(node) is Node:

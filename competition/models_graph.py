@@ -1,38 +1,14 @@
 import datetime
-import os
 from . import lm
 from competition import neostore
+from competition.lib import my_env
+from competition.lib.neostructure import *
 from flask import current_app
 from flask_login import UserMixin
-from py2neo.types import *
+from py2neo.data import Node
 from werkzeug.security import generate_password_hash, check_password_hash
 
-neo4j_params = dict(
-    user=os.environ.get('Neo4J_User'),
-    password=os.environ.get('Neo4J_Pwd'),
-    db=os.environ.get('Neo4J_Db')
-)
-host=os.environ.get("Neo4J_Host")
-if isinstance(host, str):
-    neo4j_params['host'] = host
-ns = neostore.NeoStore(**neo4j_params)
-
-# Define Node Labels
-racelabel = "Race"
-
-# Define Relation Types
-catgroup2cat = "memberOf"
-org2date = "On"
-org2loc = "In"
-org2race = "has"
-org2type = "type"
-part2part = "after"
-part2race = "participates"
-person2category = "inCategory"
-person2mf = "mf"
-person2participant = "is"
-race2category = "forCategory"
-race2mf = "forMF"
+ns = neostore.NeoStore()
 
 # mf_tx translates from man/vrouw (form value to Node name).
 mf_tx = dict(
@@ -47,6 +23,7 @@ points_per_deelname = 20
 bonus_pk = 3
 bonus_bk = 5
 bonus_mbk = -10
+
 
 class User(UserMixin):
     """
@@ -141,13 +118,9 @@ class Participant:
         When a participant is added or deleted, then the points for the race will be recalculated.
 
         :param part_id: nid of the participant
-
         :param race_id: nid of the race
-
         :param person_id: nid of the person
-
         :param prev_person_id: nid of the previous arrival in the race.
-
         :return: Participant object with participant node and nid, race nid and person nid are set.
         """
         # Todo: rework classes so that objects are kept, not nids - replace race_nid with race_obj, ...
@@ -296,6 +269,7 @@ class Participant:
         """
         This method will set the properties for the node. The calculated properties (points, rel_pos, ...) will be
         collected from the participant node and added to the list of properties that are set by the user.
+
         :param props: list of user properties for the participant node.
         :return:
         """
@@ -376,7 +350,6 @@ class Person:
         This function must be called from add(), so make it an internal function?
 
         :param name: Name of the person.
-
         :return: True if found (Person Node will be set in the object), or false if no node could be found.
         """
         props = {
@@ -394,7 +367,6 @@ class Person:
         participant. Name is set in this procedure, ID is set in the find procedure.
 
         :param props: Properties (in dict) for the person. Name, mf and category are mandatory.
-
         :return: True, if registered. False otherwise.
         """
         if self.find(props["name"]):
@@ -417,7 +389,6 @@ class Person:
         to an existing name on another node. Modified properties will be updated and removed properties will be deleted.
 
         :param props: New set of properties (name, mf (boolean) and category(nid)) for the node
-
         :return: True - in case node is rewritten successfully.
         """
         # Name change?
@@ -454,7 +425,6 @@ class Person:
         )
         return person_dict
 
-
     def get_mf(self):
         """
         This method will get mf node.
@@ -462,7 +432,6 @@ class Person:
         :return: mf node
         """
         return ns.get_endnode(start_node=self.person_node, rel_type=person2mf)
-
 
     def get_mf_value(self):
         """
@@ -472,14 +441,12 @@ class Person:
         """
         return get_mf_value(node=self.person_node, rel=person2mf)
 
-
     def get_node(self, person_id=None):
         """
         This method returns the Person Node, or sets the person node if person_id is provided.
 
         :param person_id: NID of the person. Optional. If not specified, then the node will be returned. If set, then
         the person node is set.
-
         :return: Person node.
         """
         if person_id:
@@ -493,9 +460,11 @@ class Person:
         :return: Category Node, or False if person not set to category.
         """
         cat_node = ns.get_endnode(start_node=self.person_node, rel_type=person2category)
+        # current_app.logger.info("Category node: {cn}".format(cn=cat_node))
         if isinstance(cat_node, Node):
             return cat_node
         else:
+            current_app.logger.info(type(cat_node))
             return False
 
     def active(self):
@@ -525,7 +494,6 @@ class Person:
         This method will update a person name to a new name.
 
         :param name:
-
         :return:
         """
         cn = self.get_name()
@@ -546,7 +514,6 @@ class Person:
         In case the person is already assigned to this category, nothing will be done.
 
         :param cat_nid:
-
         :return: True
         """
         current_cat_node = self.get_category()
@@ -556,7 +523,8 @@ class Person:
                 return
             else:
                 # Change category for person by removing Category first
-                ns.remove_relation_node(start_node=self.person_node, end_node=current_cat_node, rel_type=person2category)
+                ns.remove_relation_node(start_node=self.person_node, end_node=current_cat_node,
+                                        rel_type=person2category)
         # No category for person (anymore), add person to category
         cat_node = ns.node(cat_nid)
         ns.create_relation(from_node=self.person_node, to_node=cat_node, rel=person2category)
@@ -580,7 +548,7 @@ class Organization:
 
     def add(self, **org_dict):
         """
-        This method will add the organization to the kalender. The organization graph object exists of organization name
+        This method will add the organization to the calender. The organization graph object exists of organization name
         with link to date and city where it is organized.
         The organization instance attributes will be set.
         No checking is done on duplicate organization creations. These will be shown in the list and can be handled
@@ -588,7 +556,6 @@ class Organization:
 
         :param org_dict: New set of properties for the node. These properties are: name, location, datestamp and
          org_type. Datestamp needs to be of the form 'YYYY-MM-DD'. if org_type True then deelname otherwise Wedstrijd.
-
         :return: True if the organization has been registered, False if it existed already.
         """
         # Create the Organization node.
@@ -655,16 +622,14 @@ class Organization:
         """
         This method will return the label of the Organization. (Organization name, city and date). Assumption is that
         the organization has been set already.
-        :return:
+
+        :return: Label
         """
         org_name = self.org_node["name"]
         city = self.get_location()["city"]
         ds = self.get_date()
-        label = "{org_name} ({city}, {day:02d}-{month:02d}-{year})".format(org_name=org_name,
-                                                                           city=city,
-                                                                           day=ds["day"],
-                                                                           month=ds["month"],
-                                                                           year=ds["year"])
+        ds_obj = my_env.datestr2date(ds["key"])
+        label = "{org_name} ({city}, {date})".format(org_name=org_name, city=city, date=ds_obj.strftime("%d-%m-%Y"))
         return label
 
     def get_location(self):
@@ -709,7 +674,6 @@ class Organization:
 
         :param org_id: NID of the organization. Optional. If not specified, then the node will be returned. If set, then
         the organization node is set.
-
         :return: Organization node.
         """
         if org_id:
@@ -743,7 +707,6 @@ class Organization:
         Organization Node must be available for this method.
 
         :param ds: Datestamp in datetime.date format
-
         :return:
         """
         curr_ds_node = self.get_date()
@@ -840,15 +803,14 @@ class Race:
         list and can remove it again.
 
         :param props: Dictionary with race properties, including name (optional), categorylist (optional), mf and short
-         (for korte cross). Name or categorylist or short (korte cross) is mandatory.
-
+        (for korte cross). Name or categorylist or short (korte cross) is mandatory.
         :return: racename
         """
         raceconfig = race_config(**props)
         race_props = raceconfig["race_props"]
         categorie_nodes = raceconfig["category_nodes"]
         # Create Race Node with attribute name and label
-        self.race_node = ns.create_node(racelabel, **race_props)
+        self.race_node = ns.create_node(lbl_race, **race_props)
         # Add Race Node to Organization
         ns.create_relation(from_node=self.org.get_node(), rel=org2race, to_node=self.race_node)
         # Create link between race node and each category - this should also work for empty category list?
@@ -1059,6 +1021,7 @@ class Race:
         ns.node_update(**race_props)
         return
 
+
 class Location:
 
     def __init__(self, loc):
@@ -1127,7 +1090,7 @@ def organization_delete(org_id=None):
         return False
     else:
         # Remove Organization
-        current_app.logger.debug("Trying to remove organization {l}".format(l=org_label))
+        current_app.logger.debug("Trying to remove organization {lbl}".format(lbl=org_label))
         ns.remove_node_force(nid=org_id)
         # Check if this results in orphan dates, remove these dates
         current_app.logger.debug("Then remove all orphan dates")
@@ -1136,7 +1099,7 @@ def organization_delete(org_id=None):
         current_app.logger.debug("Trying to delete orphan organizations.")
         ns.clear_locations()
         current_app.logger.debug("All done")
-        current_app.logger.info("Organization {l} removed.".format(l=org_label))
+        current_app.logger.info("Organization {lbl} removed.".format(lbl=org_label))
         return True
 
 
@@ -1145,10 +1108,10 @@ def get_org_id(race_id):
     This method will return the organization ID for a Race ID: Organization has Race.
 
     :param race_id: Node ID of the race.
-
     :return: Node ID of the organization.
     """
-    org_id = ns.get_start_node(end_node_id=race_id, rel_type="has")
+    race_node = ns.node(race_id)
+    org_id = ns.get_startnode(end_node=race_node, rel_type="has")
     return org_id
 
 
@@ -1241,12 +1204,10 @@ def races4person(pers_id):
     a list of dictionaries. This includes date, organization, type of race, and race results.
 
     :param pers_id:
-
     :return: list of Participant (part),race, date, organization (org) and racetype Node dictionaries in date
     sequence.
     """
     recordlist = ns.get_race4person(pers_id)
-    # races = [{'race_id': record["race_id"], 'race_label': race_label(record["race_id"])} for record in recordlist]
     return recordlist
 
 
@@ -1354,26 +1315,26 @@ def person_list():
     Return the list of persons as person objects.
 
     :return: List of persons objects. Each person is represented as a dictionary with person nid, name, category,
-    category sequence (cat_seq), mf and number of races. The list is sorted on Category, MF and name.
+    category sequence (cat_seq), mf and number of races (races). The list is sorted on Category, MF and name.
     """
     res = ns.get_nodes('Person')
     person_arr = []
     for node in res:
-        person = Person(person_id=node["nid"])
-        cat_node = person.get_category()
-        if cat_node:
+        person_obj = Person(person_id=node["nid"])
+        cat_node = person_obj.get_category()
+        if isinstance(cat_node, Node):
             category = cat_node["name"]
             cat_seq = cat_node["seq"]
         else:
-            category = "Not defined"
+            category = def_not_defined
             cat_seq = 100000
         person_dict = dict(
-            nid=person.get_node()["nid"],
-            name=person.get_name(),
+            nid=person_obj.get_node()["nid"],
+            name=person_obj.get_name(),
             category=category,
             cat_seq=cat_seq,
-            mf=person.get_mf()["name"],
-            races=len(person.get_races4person())
+            mf=person_obj.get_mf()["name"],
+            races=len(person_obj.get_races4person())
         )
         person_arr.append(person_dict)
     persons_sorted = sorted(person_arr, key=lambda x: (x["cat_seq"], x["mf"], x["name"]))
@@ -1563,9 +1524,7 @@ def results_for_category(mf, cat):
     points for deelname at this point.
 
     :param mf: Dames / Heren
-
     :param cat: NID for the category
-
     :return: Sorted list with tuples (name, points, number of races, nid for person).
     """
     # Get participants for 'PK' and 'BK'
@@ -1626,7 +1585,7 @@ def results_for_category(mf, cat):
     for nid in wedstrijd_total:
         wedstrijd_total[nid]["nr"] = wedstrijd_total[nid]["wedstrijd_nr"] + wedstrijd_total[nid]["deelname_nr"]
         wedstrijd_total[nid]["points"] = wedstrijd_total[nid]["wedstrijd_points"] + \
-                                         wedstrijd_total[nid]["deelname_points"]
+            wedstrijd_total[nid]["deelname_points"]
         if nid in pk_list:
             wedstrijd_total[nid]["points"] += bonus_pk
         if nid in bk_list:
@@ -1691,7 +1650,6 @@ def participant_after_list(race_id):
     and 'prepend' a value for 'eerste aankomer' (value -1).
 
     :param race_id: Node ID of the race
-
     :return: List of the Person objects (list of Person nid and Person name) in sequence of arrival and value for
     'eerste aankomer'.
     """

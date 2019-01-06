@@ -1,39 +1,53 @@
 """
-This procedure will test the neostore functionality.
+This procedure will test the neostore functionality. No Flask Application items are required.
 """
 
 import os
 import unittest
-from competition import create_app
-from competition import neostore
+from competition import create_app, neostore
+from competition.lib.neostructure import *
+from config import TestConfig
+from py2neo.data import Node
 
-# Import py2neo to test on class types
-# from py2neo import Node
 
 # @unittest.skip("Focus on Coverage")
 class TestNeoStore(unittest.TestCase):
 
     def setUp(self):
         # Initialize Environment
-        self.app = create_app('testing')
+        self.app = create_app(TestConfig)
         self.app_ctx = self.app.app_context()
         self.app_ctx.push()
-        os.environ['Neo4J_User'] = self.app.config.get('NEO4J_USER')
-        os.environ['Neo4J_Pwd'] = self.app.config.get('NEO4J_PWD')
-        os.environ['Neo4J_Db'] = self.app.config.get('NEO4J_DB')
-
-        neo4j_params = dict(
-            user=os.environ.get('Neo4J_User'),
-            password=os.environ.get('Neo4J_Pwd'),
-            db=os.environ.get('Neo4J_Db')
-        )
-        # self.ns = models_graph.ns()
-        self.ns = neostore.NeoStore(**neo4j_params)
-        self.ns.init_graph()
-#       my_env.init_loghandler(__name__, "c:\\temp\\log", "warning")
+        self.ns = neostore.NeoStore()
+        # self.ns.init_graph()
+        # my_env.init_loghandler(__name__, "c:\\temp\\log", "warning")
 
     def tearDown(self):
         self.app_ctx.pop()
+
+    def test_clear_locations(self):
+        # Create a location not connected to anything else.
+        lbl = lbl_location
+        city_name = "Hillesheim"
+        props = dict(city=city_name)
+        loc_node = self.ns.create_node(lbl, **props)
+        self.assertTrue(isinstance(loc_node, Node))
+        self.assertEqual(loc_node["city"], city_name)
+        # Clear locations not connected to anything else
+        self.ns.clear_locations()
+        loc_node = self.ns.get_node(lbl, **props)
+        self.assertFalse(loc_node)
+
+    def test_nodelist_from_cursor(self):
+        query = "MATCH (n:Person) RETURN n"
+        res = self.ns.get_query(query)
+        nodelist = neostore.nodelist_from_cursor(res)
+        self.assertTrue(isinstance(nodelist, list))
+        self.assertTrue(isinstance(nodelist[0], Node))
+        query = "MATCH (n:DoesNotExist) RETURN n"
+        res = self.ns.get_query(query)
+        nodelist = neostore.nodelist_from_cursor(res)
+        self.assertFalse(nodelist)
 
     def test_remove_relation(self):
         nr_nodes = self.ns.get_nodes()
@@ -112,10 +126,136 @@ class TestNeoStore(unittest.TestCase):
         nr = len(self.ns.get_nodes(label))
         self.assertEqual(nr, 1)
 
-    def test_get_category_nodes(self):
-        res = self.ns.get_category_nodes()
-        for rec in res:
-            print(rec['cat']["name"])
+    def test_get_endnode(self):
+        # First check that I can get a single end node for normal usage.
+        lbl = "Person"
+        my_name = "Dirk Vermeylen"
+        props = dict(name=my_name)
+        start_node = self.ns.get_node(lbl, **props)
+        self.assertTrue(isinstance(start_node, Node))
+        self.assertEqual(start_node["name"], my_name)
+        rel_type = person2category
+        end_node = self.ns.get_endnode(start_node, rel_type)
+        self.assertTrue(isinstance(end_node, Node))
+        self.assertEqual(end_node["name"], "Masters +50")
+        # Check I get multiple results if relation type is not specified
+        end_node = self.ns.get_endnode(start_node)
+        self.assertTrue(isinstance(end_node, Node))
+        # I also get multiple relations for relation type "is"
+        rel_type = person2participant
+        end_node = self.ns.get_endnode(start_node, rel_type)
+        self.assertTrue(isinstance(end_node, Node))
+        # No return on invalid relation
+        rel_type = "DoesNotExist"
+        end_node = self.ns.get_endnode(start_node, rel_type)
+        self.assertFalse(end_node)
+        # No return on invalid Node
+        start_node = "DoesNotExist"
+        end_node = self.ns.get_endnode(start_node, rel_type)
+        self.assertFalse(end_node)
+
+    def test_get_endnodes(self):
+        # First check that I can get a single end node.
+        lbl = "Person"
+        my_name = "Dirk Vermeylen"
+        props = dict(name=my_name)
+        start_node = self.ns.get_node(lbl, **props)
+        self.assertTrue(isinstance(start_node, Node))
+        self.assertEqual(start_node["name"], my_name)
+        rel_type = person2category
+        end_nodes = self.ns.get_endnodes(start_node, rel_type)
+        self.assertEqual(len(end_nodes), 1)
+        self.assertTrue(isinstance(end_nodes[0], Node))
+        self.assertEqual(end_nodes[0]["name"], "Masters +50")
+        # Check I get multiple results if relation type is not specified
+        end_nodes = self.ns.get_endnodes(start_node)
+        self.assertTrue(len(end_nodes) > 1)
+        # I also get multiple relations for relation type "is"
+        rel_type = person2participant
+        end_nodes = self.ns.get_endnodes(start_node, rel_type)
+        self.assertTrue(len(end_nodes) > 1)
+        # No return on invalid relation
+        rel_type = "DoesNotExist"
+        end_nodes = self.ns.get_endnodes(start_node, rel_type)
+        self.assertFalse(end_nodes)
+        # No return on invalid Node
+        start_node = "DoesNotExist"
+        end_nodes = self.ns.get_endnodes(start_node, rel_type)
+        self.assertFalse(end_nodes)
+
+    def test_get_location_nodes(self):
+        res = self.ns.get_location_nodes()
+        self.assertTrue(isinstance(res, list))
+        self.assertTrue(isinstance(res[0]["city"], str))
+        for n in res:
+            print(n["city"])
+
+    def test_get_race4person(self):
+        lbl = lbl_person
+        props = dict(name="Dirk Vermeylen")
+        person_node = self.ns.get_node(lbl, **props)
+        res = self.ns.get_race4person(person_node["nid"])
+        self.assertTrue(isinstance(res, list))
+        first_race = res[0]
+        self.assertTrue(isinstance(first_race["part"], dict))
+        self.assertTrue(isinstance(first_race["race"], dict))
+        self.assertTrue(isinstance(first_race["date"], dict))
+        self.assertTrue(isinstance(first_race["org"], dict))
+        self.assertTrue(isinstance(first_race["orgtype"], dict))
+        self.assertTrue(isinstance(first_race["loc"], dict))
+        # Test on invalid node
+        lbl = lbl_organization
+        props = dict(name="Veldloop Arendonk")
+        person_node = self.ns.get_node(lbl, **props)
+        res = self.ns.get_race4person(person_node["nid"])
+        self.assertFalse(res)
+        res = self.ns.get_race4person("DoesNotExist")
+        self.assertFalse(res)
+
+    def test_get_race_list(self):
+        # First get org_id for organization
+        lbl = lbl_organization
+        props = dict(name="Veldloop Arendonk")
+        org_node = self.ns.get_node(lbl, **props)
+        race_list = self.ns.get_race_list(org_node["nid"])
+        self.assertTrue(isinstance(race_list, list))
+        first_race = race_list[0]
+        self.assertTrue(isinstance(first_race, dict))
+        self.assertTrue(lbl_race in first_race["race"].labels)
+        self.assertTrue(lbl_mf in first_race["mf"].labels)
+        # Also test False for non-existing organization (other node type or invalid node type)
+        lbl = lbl_person
+        props = dict(name="Dirk Vermeylen")
+        name_node = self.ns.get_node(lbl, **props)
+        race_list = self.ns.get_race_list(name_node["nid"])
+        self.assertFalse(race_list)
+        race_list = self.ns.get_race_list("DoesNotExist")
+        self.assertFalse(race_list)
+
+    def test_get_startnode(self):
+        # First check that I can get a single start node for normal usage.
+        lbl = "Location"
+        my_name = "Mol"
+        props = dict(city=my_name)
+        end_node = self.ns.get_node(lbl, **props)
+        self.assertTrue(isinstance(end_node, Node))
+        self.assertEqual(end_node["city"], my_name)
+        rel_type = org2loc
+        start_node = self.ns.get_startnode(end_node, rel_type)
+        self.assertTrue(isinstance(start_node, Node))
+        self.assertEqual(start_node["name"], "Cross Cup")
+        # Check I get no failure if relation type is not specified
+        start_node = self.ns.get_startnode(end_node)
+        self.assertTrue(isinstance(start_node, Node))
+        # No return on invalid relation
+        rel_type = "DoesNotExist"
+        start_node = self.ns.get_startnode(end_node, rel_type)
+        self.assertFalse(start_node)
+        # No return on invalid Node
+        end_node = "DoesNotExist"
+        start_node = self.ns.get_startnode(end_node, rel_type)
+        self.assertFalse(start_node)
+
 
 if __name__ == "__main__":
     unittest.main()
