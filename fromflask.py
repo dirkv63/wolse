@@ -1,5 +1,3 @@
-import os
-import platform
 from competition import create_app, lm
 
 

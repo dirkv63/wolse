@@ -1,8 +1,10 @@
 # Nodes
+lbl_category = "Category"
 lbl_day = "Day"
 lbl_location = "Location"
 lbl_mf = "MF"
 lbl_organization = "Organization"
+lbl_organizationType = "OrgType"
 lbl_person = "Person"
 lbl_race = "Race"
 
@@ -22,3 +24,19 @@ race2mf = "forMF"
 
 # Definitions
 def_not_defined = "Not defined"
+def_wedstrijd = "Wedstrijd"
+def_deelname = "Deelname"
+
+# Categories
+def_cat_list = ["Benjamins °2012",
+                "Benjamins °2011",
+                "Pupillen °2010",
+                "Pupillen °2009",
+                "Miniemen °2008",
+                "Miniemen °2007",
+                "Kadetten",
+                "Scholieren",
+                "Juniors",
+                "Seniors",
+                "Masters -50",
+                "Masters +50"]

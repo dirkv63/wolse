@@ -1,11 +1,8 @@
-# import logging
-# import os
-from competition import neostore
 from config import Config
 from flask import Flask
 from flask_bootstrap import Bootstrap
 from flask_login import LoginManager
-from competition.lib import my_env
+from competition.lib import my_env, neostore
 
 bootstrap = Bootstrap()
 lm = LoginManager()
@@ -17,7 +14,6 @@ def create_app(config_class=Config):
     Create an application instance.
 
     :param config_class: Pointer to the configuration file.
-
     :return: the configured application object.
     """
     app = Flask(__name__)

@@ -1,8 +1,7 @@
 # import competition.models_graph as mg
 # import logging
 # import datetime
-from competition.lib import my_env
-from competition import models_graph as mg
+from competition.lib import my_env, models_graph as mg
 # from lib import neostore
 from flask import render_template, flash, current_app, redirect, url_for, request
 from flask_login import login_required, login_user, logout_user
@@ -65,6 +64,18 @@ def location_add():
         else:
             flash("Form did not validate on submit, how did this happen?", "error")
         return redirect(ref or url_for('main.index'))
+
+
+@main.route('/initenv')
+def initenv():
+    """
+    This method will initialize the environment: register a user, set the default nodes and indeces.
+    This will be done on an empty database only.
+
+    :return:
+    """
+    mg.initialize_neo()
+    return render_template('index.html')
 
 
 @main.route('/person/add', methods=['GET', 'POST'])

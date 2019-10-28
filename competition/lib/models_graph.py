@@ -1,5 +1,5 @@
 import datetime
-from . import lm
+from competition import lm
 from competition import neostore
 from competition.lib import my_env
 from competition.lib.neostructure import *
@@ -1153,17 +1153,69 @@ def get_race_list_attribs(org_id):
     return params
 
 
+def initialize_neo():
+    """
+    This method checks for an empty database. If so, then default user will be initialized and mandatory nodes created.
+    The database structure will be defined.
+
+    :return:
+    """
+    nodes = ns.get_nodes()
+    if isinstance(nodes, list):
+        current_app.logger.info("Nodes found, no need to initialize.")
+        return
+    else:
+        current_app.logger.info("Initialize environment.")
+        init_graph()
+        user = User()
+        user.register("run", "olse")
+        return
+
+
+def init_graph():
+    """
+    This method will initialize the graph. It will set indices and create nodes required for the application
+    (on condition that the nodes do not exist already).
+
+    :return:
+    """
+    stmt = "CREATE CONSTRAINT ON (n:{0}) ASSERT n.{1} IS UNIQUE"
+    ns.get_query(stmt.format(lbl_location, 'city'))
+    ns.get_query(stmt.format(lbl_person, 'name'))
+    # ns.get_query(stmt.format(lbl_raceType, 'name'))
+    # ns.get_query(stmt.format(lbl_organizationType, 'name'))
+    nid_labels = [lbl_day, lbl_location, lbl_mf, lbl_organization, lbl_organization, lbl_person, lbl_race]
+    stmt = "CREATE CONSTRAINT ON (n:{nid_label}) ASSERT n.nid IS UNIQUE"
+    for nid_label in nid_labels:
+        ns.get_query(stmt.format(nid_label=nid_label))
+    # Organization type nodes and Race type nodes are required for empty database
+    # Organization
+    for name in [def_wedstrijd, def_deelname]:
+        props = dict(name=name)
+        if not ns.get_node(lbl_organizationType, **props):
+            ns.create_node(lbl_organizationType, **props)
+    # mf
+    for name in ["Dames", "Heren"]:
+        props = dict(name=name)
+        if not ns.get_node(lbl_mf, **props):
+            ns.create_node(lbl_mf, **props)
+    seq = 0
+    for name in def_cat_list:
+        seq += 1
+        props = dict(name=name, seq=seq)
+        if not ns.get_node(lbl_category, **props):
+            ns.create_node(lbl_category, **props)
+    return
+
+
 def link_mf(mf, node, rel):
     """
     This method will link the node to current mf. If Link does not exist, it will be created. If link is to other
     node, the link will be removed and attached to required mf node.
 
     :param mf: mf attribute from web form (man/vrouw)
-
     :param node: Start node for the relation (Person or Race)
-
     :param rel: relation
-
     :return:
     """
     current_app.logger.info("mf: {mf}, rel: {rel}".format(mf=mf, rel=rel))
@@ -1318,26 +1370,30 @@ def person_list():
     category sequence (cat_seq), mf and number of races (races). The list is sorted on Category, MF and name.
     """
     res = ns.get_nodes('Person')
-    person_arr = []
-    for node in res:
-        person_obj = Person(person_id=node["nid"])
-        cat_node = person_obj.get_category()
-        if isinstance(cat_node, Node):
-            category = cat_node["name"]
-            cat_seq = cat_node["seq"]
-        else:
-            category = def_not_defined
-            cat_seq = 100000
-        person_dict = dict(
-            nid=person_obj.get_node()["nid"],
-            name=person_obj.get_name(),
-            category=category,
-            cat_seq=cat_seq,
-            mf=person_obj.get_mf()["name"],
-            races=len(person_obj.get_races4person())
-        )
-        person_arr.append(person_dict)
-    persons_sorted = sorted(person_arr, key=lambda x: (x["cat_seq"], x["mf"], x["name"]))
+    if isinstance(res, list):
+        person_arr = []
+        for node in res:
+            person_obj = Person(person_id=node["nid"])
+            cat_node = person_obj.get_category()
+            if isinstance(cat_node, Node):
+                category = cat_node["name"]
+                cat_seq = cat_node["seq"]
+            else:
+                category = def_not_defined
+                cat_seq = 100000
+            person_dict = dict(
+                nid=person_obj.get_node()["nid"],
+                name=person_obj.get_name(),
+                category=category,
+                cat_seq=cat_seq,
+                mf=person_obj.get_mf()["name"],
+                races=len(person_obj.get_races4person())
+            )
+            person_arr.append(person_dict)
+        persons_sorted = sorted(person_arr, key=lambda x: (x["cat_seq"], x["mf"], x["name"]))
+    else:
+        current_app.logger.info("No persons found.")
+        persons_sorted = []
     return persons_sorted
 
 
@@ -1346,7 +1402,6 @@ def get_cat4part(part_nid):
     This method will return category nid for the participant.
 
     :param part_nid: Nid of the participant node.
-
     :return: Category NID, or False if no category could be found.
     """
     return ns.get_cat4part(part_nid)
