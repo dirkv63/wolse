@@ -78,18 +78,6 @@ def initenv():
     return render_template('index.html')
 
 
-@main.route('/initkort')
-def initkort():
-    """
-    This method will initialize the environment: register a user, set the default nodes and indeces.
-    This will be done on an empty database only.
-
-    :return:
-    """
-    mg.init_kort()
-    return render_template('index.html')
-
-
 @main.route('/person/add', methods=['GET', 'POST'])
 @login_required
 def person_add(person_id=None):

@@ -1203,20 +1203,6 @@ def init_graph():
         props = dict(name=name, seq=seq)
         if not ns.get_node(lbl_category, **props):
             ns.create_node(lbl_category, **props)
-    return
-    """
-    # Create Category Group for Korte Cross
-    props = dict(name=def_korte_cross)
-    end_node = ns.create_node(lbl_categoryGroup, **props)
-    for cat in def_cat_kort:
-        props = dict(name=cat)
-        start_node = ns.get_node(lbl_category, **props)
-        ns.create_relation(start_node, catgroup2cat, end_node)
-    return
-    """
-
-
-def init_kort():
     # Create Category Group for Korte Cross
     props = dict(name=def_korte_cross)
     end_node = ns.create_node(lbl_categoryGroup, **props)
