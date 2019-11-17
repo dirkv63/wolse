@@ -1,5 +1,6 @@
 # Nodes
 lbl_category = "Category"
+lbl_categoryGroup = "categoryGroup"
 lbl_day = "Day"
 lbl_location = "Location"
 lbl_mf = "MF"
@@ -26,6 +27,7 @@ race2mf = "forMF"
 def_not_defined = "Not defined"
 def_wedstrijd = "Wedstrijd"
 def_deelname = "Deelname"
+def_korte_cross = "Korte Cross"
 
 # Categories
 def_cat_list = ["Benjamins °2012",
@@ -37,6 +39,10 @@ def_cat_list = ["Benjamins °2012",
                 "Kadetten",
                 "Scholieren",
                 "Juniors",
+                "Seniors",
+                "Masters -50",
+                "Masters +50"]
+def_cat_kort = ["Juniors",
                 "Seniors",
                 "Masters -50",
                 "Masters +50"]

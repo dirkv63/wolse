@@ -782,9 +782,7 @@ class Race:
         Define the Race object.
 
         :param org_id: Node ID of the Organization, used to create a new race.
-
         :param race_id: Node ID of the Race, to handle an existing race. Organization will be calculated from race.
-
         :return:
         """
         self.org = None
@@ -803,7 +801,7 @@ class Race:
         list and can remove it again.
 
         :param props: Dictionary with race properties, including name (optional), categorylist (optional), mf and short
-        (for korte cross). Name or categorylist or short (korte cross) is mandatory.
+        (for korte cross). Name OR categorylist OR short (korte cross) is mandatory.
         :return: racename
         """
         raceconfig = race_config(**props)
@@ -1206,6 +1204,27 @@ def init_graph():
         if not ns.get_node(lbl_category, **props):
             ns.create_node(lbl_category, **props)
     return
+    """
+    # Create Category Group for Korte Cross
+    props = dict(name=def_korte_cross)
+    end_node = ns.create_node(lbl_categoryGroup, **props)
+    for cat in def_cat_kort:
+        props = dict(name=cat)
+        start_node = ns.get_node(lbl_category, **props)
+        ns.create_relation(start_node, catgroup2cat, end_node)
+    return
+    """
+
+
+def init_kort():
+    # Create Category Group for Korte Cross
+    props = dict(name=def_korte_cross)
+    end_node = ns.create_node(lbl_categoryGroup, **props)
+    for cat in def_cat_kort:
+        props = dict(name=cat)
+        start_node = ns.get_node(lbl_category, **props)
+        ns.create_relation(start_node, catgroup2cat, end_node)
+    return
 
 
 def link_mf(mf, node, rel):
@@ -1288,7 +1307,6 @@ def race_config(**params):
     This method will calculate the race configuration from params specified.
 
     :param params:
-
     :return: Dictionary containing race_props (Properties for the race Node) and category_nodes (list of category nodes
     for the race. The list category nodes can be empty.
     """
@@ -1438,9 +1456,9 @@ def get_cat_short_cross():
 
     :return: Category nodes associated with short cross.
     """
-    sc_label = "categoryGroup"
+    sc_label = lbl_categoryGroup
     sc_props = dict(
-        name="Korte Cross"
+        name=def_korte_cross
     )
     sc_node = ns.get_node(sc_label, **sc_props)
     return ns.get_startnodes(end_node=sc_node, rel_type=catgroup2cat)
@@ -1452,7 +1470,6 @@ def get_location(nid):
     as creator attribute.
 
     :param nid: nid of the location node, returned by a selection field.
-
     :return: city name of the location node, or False if no location found.
     """
     loc = ns.get_node("Location", nid=nid)
