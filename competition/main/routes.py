@@ -190,7 +190,8 @@ def organization_add(org_id=None):
         org_dict = dict(name=form.name.data,
                         location=city,
                         datestamp=form.datestamp.data,
-                        org_type=form.org_type.data)
+                        org_type=form.org_type.data,
+                        punten=form.punten.data)
         if org_id:
             current_app.logger.debug("Modify organisation with ID {id}".format(id=org_id))
             org = mg.Organization(org_id=org_id)
@@ -213,28 +214,27 @@ def organization_add(org_id=None):
     if org_id:
         current_app.logger.debug("Get Form to edit organization with ID: {id}".format(id=org_id))
         org = mg.Organization(org_id=org_id)
-        name = org.get_name()
-        location = org.get_location()["nid"]
-        datestamp = org.get_date()["key"]
         org_type = org.get_org_type()
         if org_type == "Deelname":
             org_type_flag = True
         else:
             org_type_flag = False
         form = OrganizationAdd(org_type=org_type_flag)
-        form.name.data = name
-        form.location.data = location
-        form.datestamp.data = my_env.datestr2date(datestamp)
+        form.name.data = org.get_name()
+        form.location.data = org.get_location()["nid"]
+        form.datestamp.data = my_env.datestr2date(org.get_date()["key"])
+        form.punten.data = org.get_punten()
     else:
         current_app.logger.debug("Get Form to add organization")
-        name = None
-        location = None
-        datestamp = None
+        # name = None
+        # location = None
+        # datestamp = None
         form = OrganizationAdd()
     # Form did not validate successfully, keep fields.
     form.location.choices = mg.get_location_list()
-    return render_template('organization_add.html', form=form, name=name, location=location,
-                           datestamp=datestamp, organizations=organizations)
+    # return render_template('organization_add.html', form=form, name=name, location=location,
+    #                        datestamp=datestamp, organizations=organizations)
+    return render_template('organization_add.html', form=form, organizations=organizations)
 
 
 @main.route('/organization/edit/<org_id>', methods=['GET', 'POST'])
@@ -244,7 +244,6 @@ def organization_edit(org_id):
     This method will edit an existing organization.
 
     :param org_id: The Node ID of the organization.
-
     :return:
     """
     # current_app.logger.debug("Evaluate Organization/edit")
