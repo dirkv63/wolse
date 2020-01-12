@@ -874,37 +874,32 @@ class Race:
 
     def calculate_points(self):
         """
-        This method will calculate the points for the race. Races can be of 3 different types: Wedstrijd, korte cross
-        or deelname.
+        This method will calculate the points for the race if it is a 'Wedstrijd'. Deelname and Bonus points will be
+        added later.
 
-        :return: All participants in the race have the correct points and position.
+        :return: All participants in the race have the correct points and position for the Wedstrijd.
         """
         race_type = self.get_racetype()
-        deelname = self.get_bonus()
-        node_list = ns.get_participant_seq_list(self.race_node["nid"])
-        if node_list:
-            cat_cnt = {}
-            cat_lst = self.get_cat_nids()
-            for k in cat_lst:
-                cat_cnt[k] = 0
-            cnt = 0
-            for part in node_list:
-                cat = get_cat4part(part["nid"])
-                cat_cnt[cat] += 1
-                cnt += 1
-                if race_type == "Wedstrijd":
-                    points = points_race(cat_cnt[cat])
-                elif race_type == "Short":
-                    points = points_short(cnt)
-                elif race_type == "Deelname":
-                    points = deelname
-                else:
-                    current_app.logger.error("Race Type {rt} not defined.".format(rt=race_type))
-                    points = deelname
-                rel_pos = cnt
-                # Set points for participant - Participant node is identified on nid.
-                props = dict(nid=part["nid"], points=points, rel_pos=rel_pos)
-                ns.node_set_attribs(**props)
+        if race_type == "Wedstrijd" or race_type == "Short":
+            node_list = ns.get_participant_seq_list(self.race_node["nid"])
+            if node_list:
+                cat_cnt = {}
+                cat_lst = self.get_cat_nids()
+                for k in cat_lst:
+                    cat_cnt[k] = 0
+                cnt = 0
+                for part in node_list:
+                    cat = get_cat4part(part["nid"])
+                    cat_cnt[cat] += 1
+                    cnt += 1
+                    if race_type == "Wedstrijd":
+                        points = points_race(cat_cnt[cat])
+                    elif race_type == "Short":
+                        points = points_short(cnt)
+                    rel_pos = cnt
+                    # Set points for participant - Participant node is identified on nid.
+                    props = dict(nid=part["nid"], points=points, rel_pos=rel_pos)
+                    ns.node_set_attribs(**props)
         return
 
     def get_bonus(self):
