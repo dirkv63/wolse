@@ -19,7 +19,7 @@ mf_tx = dict(
 mf_tx_inv = {y: x for x, y in mf_tx.items()}
 
 # Calculate points
-points_per_deelname = 20
+points_per_deelname = 18
 bonus_pk = 3
 bonus_bk = 5
 bonus_mbk = -10
