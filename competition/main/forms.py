@@ -1,6 +1,5 @@
 from flask_wtf import FlaskForm as Form
-from wtforms import StringField, SubmitField, PasswordField, BooleanField, SelectField, RadioField, HiddenField, \
-    IntegerField
+from wtforms import StringField, SubmitField, PasswordField, BooleanField, SelectField, RadioField, HiddenField
 from wtforms import SelectMultipleField
 from wtforms.fields.html5 import DateField
 import wtforms.validators as wtv
@@ -24,8 +23,7 @@ class OrganizationAdd(Form):
     name = StringField('Naam', validators=[wtv.InputRequired(), wtv.Length(1, 24)])
     location = SelectField('Locatie: ', coerce=str)
     datestamp = DateField('Datum')
-    org_type = BooleanField('Deelname ')
-    punten = IntegerField('(Bonus) punten: ')
+    org_type = BooleanField('Punten voor Deelname')
     submit = SubmitField('OK')
 
 

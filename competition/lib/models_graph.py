@@ -554,8 +554,8 @@ class Organization:
         No checking is done on duplicate organization creations. These will be shown in the list and can be handled
         manually by the user.
 
-        :param org_dict: New set of properties for the node. These properties are: name, location, datestamp, punten and
-        org_type. Datestamp needs to be of the form 'YYYY-MM-DD'. if org_type True then deelname otherwise Wedstrijd.
+        :param org_dict: New set of properties for the node. These properties are: name, location, datestamp and
+         org_type. Datestamp needs to be of the form 'YYYY-MM-DD'. if org_type True then deelname otherwise Wedstrijd.
         :return: True if the organization has been registered, False if it existed already.
         """
         # Create the Organization node.
@@ -569,8 +569,6 @@ class Organization:
             self.set_org_type("Deelname")
         else:
             self.set_org_type("Wedstrijd")
-        # Set Punten
-        self.set_punten(org_dict['punten'])
         return True
 
     def edit(self, **properties):
@@ -581,10 +579,11 @@ class Organization:
         node without a need to find the date and location first. Therefore the delete function requires a more generic
         date and location removal, where a check on all orphans is done.
 
-        :param properties: Modified set of properties for the node. These properties are: name, location, datestamp,
-         punten and org_type. Datestamp must be of the form 'YYYY-MM-DD'
+        :param properties: Modified set of properties for the node. These properties are: name, location, datestamp and
+         org_type. Datestamp must be of the form 'YYYY-MM-DD'
+
         :return: True if the organization has been updated, False if the organization (name, location, date) existed
-         already. A change in Organization Type or punten is also a successful (True) change.
+         already. A change in Organization Type only is also a successful (True) change.
         """
         # Check Organization Type
         if properties['org_type']:
@@ -592,6 +591,14 @@ class Organization:
         else:
             org_type = "Wedstrijd"
         self.set_org_type(org_type=org_type)
+        """
+        if self.set_org_type(org_type):
+            # Organization type changed, so re-calculate points for all races in the organization
+            racelist = get_race_list(self.org_node["nid"])
+            for rec in racelist:
+                # Probably not efficient, but then you should't change organization type too often.
+                points_for_race(rec["race_id"])
+        """
         # Check Organization name.
         if properties['name'] != self.get_name():
             node_prop = ns.node_props(nid=self.get_org_id())
@@ -609,8 +616,6 @@ class Organization:
             ns.remove_node(curr_loc_node)
         # Check Date
         self.set_date(ds=properties["datestamp"])
-        # Set Punten
-        self.set_punten(properties["punten"])
         return True
 
     def get_label(self):
@@ -683,18 +688,6 @@ class Organization:
         """
         return ns.get_part_for_org(self.get_org_id())
 
-    def get_punten(self):
-        """
-        This method will get the punten for the Organizatie. For Deelname, it is the amount for the participation..
-        For Wedstrijd, it will get the bonus-punten (most of the time 0, PK: +3, BK: +5).
-
-        :return:
-        """
-        if isinstance(self.org_node["punten"], int):
-            return self.org_node["punten"]
-        else:
-            return 0
-
     def get_org_type(self):
         """
         This method will return the organization type(Wedstrijd or Deelname).
@@ -757,6 +750,7 @@ class Organization:
 
 
         :param org_type: 'Wedstrijd' or 'Deelname"
+
         :return: True if org_type is set (or changed), False if org_type is not changed.
         """
         # Todo: Add link to recalculate points in the races (this link is in org edit!)
@@ -772,20 +766,6 @@ class Organization:
         org_type_node = get_org_type_node(org_type)
         ns.create_relation(from_node=self.org_node, rel=org2type, to_node=org_type_node)
         return True
-
-    def set_punten(self, punten):
-        """
-        This method will set the punten for the Organizatie. For Deelname, it will set the punten.
-        For Wedstrijd, it will set the bonus-punten (typically: PK: +3, BK: +5).
-
-        :param punten:
-        :return:
-        """
-        if not isinstance(punten, int):
-            punten = 0
-        props = dict(nid=self.get_org_id(), punten=punten)
-        ns.node_set_attribs(**props)
-        return
 
 
 class Race:
@@ -880,7 +860,6 @@ class Race:
         :return: All participants in the race have the correct points and position.
         """
         race_type = self.get_racetype()
-        deelname = self.get_bonus()
         node_list = ns.get_participant_seq_list(self.race_node["nid"])
         if node_list:
             cat_cnt = {}
@@ -897,24 +876,15 @@ class Race:
                 elif race_type == "Short":
                     points = points_short(cnt)
                 elif race_type == "Deelname":
-                    points = deelname
+                    points = 20
                 else:
                     current_app.logger.error("Race Type {rt} not defined.".format(rt=race_type))
-                    points = deelname
+                    points = 20
                 rel_pos = cnt
                 # Set points for participant - Participant node is identified on nid.
                 props = dict(nid=part["nid"], points=points, rel_pos=rel_pos)
                 ns.node_set_attribs(**props)
         return
-
-    def get_bonus(self):
-        """
-        This function will get bonus or deelname punten for the race. For deelname, this is the only part taken into
-        account. For Race, this is the bonus punten as earned for PK or BK.
-
-        :return: bonus or deelname punten for the race.
-        """
-        return self.org.get_punten()
 
     def get_next_part(self):
         """
@@ -1549,6 +1519,7 @@ def points_race(pos):
     Points are in sequence of arrival: 25 - 20 - 18 - 16 - 15 - ...
 
     :param pos: Position in the race
+
     :return: Points associated for this position. Minimum is one point.
     """
     if pos == 1:
@@ -1570,6 +1541,7 @@ def points_short(pos):
     Points are in sequence of arrival: 20 - 17 - 15 - 14 - ...
 
     :param pos: Position in the race
+
     :return: Points associated for this position. Minimum is one point.
     """
     if pos == 1:
@@ -1589,6 +1561,7 @@ def points_sum(point_list):
     calculated.
 
     :param point_list: list of the points for the participant.
+
     :return: sum of the points
     """
     # Todo: points for 'deelname' should be calculated separately and in full
