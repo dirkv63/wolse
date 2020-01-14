@@ -19,10 +19,10 @@ mf_tx = dict(
 mf_tx_inv = {y: x for x, y in mf_tx.items()}
 
 # Calculate points
-points_per_deelname = 18
+points_for_deelname = 18
 bonus_pk = 3
 bonus_bk = 5
-bonus_mbk = -10
+bonus_mbk = -8
 
 
 class User(UserMixin):
@@ -876,10 +876,10 @@ class Race:
                 elif race_type == "Short":
                     points = points_short(cnt)
                 elif race_type == "Deelname":
-                    points = 20
+                    points = points_for_deelname
                 else:
                     current_app.logger.error("Race Type {rt} not defined.".format(rt=race_type))
-                    points = 20
+                    points = points_for_deelname
                 rel_pos = cnt
                 # Set points for participant - Participant node is identified on nid.
                 props = dict(nid=part["nid"], points=points, rel_pos=rel_pos)
@@ -1620,7 +1620,7 @@ def results_for_category(mf, cat):
     for nid in result_list:
         params = dict(
             deelname_nr=len(result_list[nid]),
-            deelname_points=len(result_list[nid] * points_per_deelname)
+            deelname_points=len(result_list[nid] * points_for_deelname)
         )
         deelname_total[nid] = params
     # Merge wedstrijd_total and deelname_total
