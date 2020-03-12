@@ -66,6 +66,19 @@ def location_add():
         return redirect(ref or url_for('main.index'))
 
 
+@main.route("/aaa_dates")
+def aaa_dates():
+    """
+    Call to add dates to organizations without date.
+
+    :return:
+    """
+    org_list = mg.aaa_add_dates()
+    org_names = [org['name'] for org in org_list]
+    current_app.logger.info(f"Organizations: {org_names}")
+    return redirect(url_for('main.index'))
+
+
 @main.route('/initenv')
 def initenv():
     """
@@ -244,7 +257,6 @@ def organization_edit(org_id):
     This method will edit an existing organization.
 
     :param org_id: The Node ID of the organization.
-
     :return:
     """
     # current_app.logger.debug("Evaluate Organization/edit")
@@ -335,7 +347,6 @@ def races_default(org_id):
     The races need to be modified for combination or short race.
 
     :param org_id: Organization nid.
-
     :return: Redirect to the races_list for the organization
     """
     nr_races = len(mg.get_race_list(org_id=org_id))
@@ -355,7 +366,6 @@ def race_delete(race_id):
     race.
 
     :param race_id: The Node ID of the race.
-
     :return: True if the race is removed, False otherwise.
     """
     current_app.logger.debug("Delete race {race_id}".format(race_id=race_id))
@@ -374,11 +384,8 @@ def race_delete(race_id):
 def race_edit(org_id, race_id):
     """
     This method will edit an existing race.
-
     :param org_id: The Node ID of the organization.
-
     :param race_id: The Node ID of the race.
-
     :return:
     """
     return race_add(org_id=org_id, race_id=race_id)

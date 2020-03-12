@@ -102,41 +102,20 @@ class NeoStore:
         self.graph.merge(rel)
         return
 
-    def clear_date_node(self, label):
+    def clear_date(self):
         """
-        This method will clear every date node as specified by label. Label can be Day, Month or Year. The node will be
-        deleted if not used anymore. So it can have only one incoming relation: DAY - MONTH or YEAR.
-        Therefore find all relations. If there is only one, then the date node can be deleted.
+        This method will clear date nodes that are no longer connected with other nodes.
 
-        :param label: Day, Month or Year
         :return:
         """
-        current_app.logger.info("Clearing all date nodes with label {lbl}".format(lbl=label))
+        current_app.logger.info("Clearing orphan date nodes")
         query = """
             MATCH (n:{label})-[rel]-()
             WITH n, count(rel) as rel_cnt
-            WHERE rel_cnt=1
+            WHERE rel_cnt=0
             DETACH DELETE n
-        """.format(label=label.capitalize())
+        """.format(label=lbl_day)
         self.graph.run(query)
-        return
-
-    def clear_date(self):
-        """
-        This method will clear dates that are no longer connected to an organization, a person's birthday or any other
-        item.
-        First find days with one relation only, this must be a connection to the month. Remove these days.
-        Then find months with one relation only, this must be a connection to the year. Remove these months.
-        Finally find years with one relation only, this must be a connection to the Gregorian calendar. Remove these
-        years.
-        Compare with method remove_date(ds), that will check to remove only a specific date.
-
-        :return:
-        """
-        # First Remove Days
-        self.clear_date_node("Day")
-        self.clear_date_node("Month")
-        self.clear_date_node("Year")
         return
 
     def date_node(self, ds):
@@ -802,7 +781,7 @@ class NeoStore:
         # Todo: rename the method to remove_relation.
         rel = Relationship(start_node, rel_type, end_node)
         # Do I need to merge first?
-        self.graph.merge(rel)
+        # self.graph.merge(rel)
         self.graph.separate(rel)
         return
 

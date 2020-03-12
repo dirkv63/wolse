@@ -705,7 +705,7 @@ class Organization:
         """
         This method will create a relation between the organization and the date. Relation type is 'On'.
         Organization Node must be available for this method.
-
+m
         :param ds: Datestamp in datetime.date format
         :return:
         """
@@ -1168,6 +1168,26 @@ def initialize_neo():
         user = User()
         user.register("run", "olse")
         return
+
+
+def aaa_add_dates():
+    """
+    This method is for debugging purposes only. It will add dates to organizations without a date.
+
+    :return:
+    """
+    query = """
+        MATCH (org:Organization)
+        WHERE NOT (org)-[:On]->(:Day)
+        RETURN org
+    """
+    res = ns.get_query(query)
+    org_list = neostore.nodelist_from_cursor(res)
+    ds = datetime.date.today()
+    for org_node in org_list:
+        org = Organization(org_id=org_node['nid'])
+        org.set_date(ds)
+    return org_list
 
 
 def init_graph():
