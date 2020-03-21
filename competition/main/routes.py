@@ -75,7 +75,7 @@ def aaa_dates():
     """
     org_list = mg.aaa_add_dates()
     org_names = [org['name'] for org in org_list]
-    current_app.logger.info(f"Organizations: {org_names}")
+    current_app.logger.info("Organizations: {org_names}".format(org_names=org_names))
     return redirect(url_for('main.index'))
 
 
