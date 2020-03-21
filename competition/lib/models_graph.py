@@ -157,7 +157,6 @@ class Participant:
         Now link current participant to previous arrival and to next arrival.
 
         :param prev_person_id: nid of previous arrival, or -1 if current participant is first arrival
-
         :return:
         """
         # Count total number of arrivals.
@@ -523,8 +522,8 @@ class Person:
                 return
             else:
                 # Change category for person by removing Category first
-                ns.remove_relation_node(start_node=self.person_node, end_node=current_cat_node,
-                                        rel_type=person2category)
+                ns.remove_relation(start_nid=self.person_node['nid'], end_nid=current_cat_node['nid'],
+                                   rel_type=person2category)
         # No category for person (anymore), add person to category
         cat_node = ns.node(cat_nid)
         ns.create_relation(from_node=self.person_node, to_node=cat_node, rel=person2category)
@@ -611,7 +610,8 @@ class Organization:
             # First create link to new location
             self.set_location(properties["location"])
             # Then remove link to current location
-            ns.remove_relation_node(start_node=self.org_node, rel_type=org2loc, end_node=curr_loc_node)
+            # ns.remove_relation_node(start_node=self.org_node, rel_type=org2loc, end_node=curr_loc_node)
+            ns.remove_relation(start_nid=set.org_node['nid'], end_nid=curr_loc_node['nid'], rel_type=org2loc)
             # Finally check if current location is still required. Remove if there are no more links.
             ns.remove_node(curr_loc_node)
         # Check Date
@@ -710,18 +710,17 @@ m
         :return:
         """
         curr_ds_node = self.get_date()
-        if curr_ds_node:
+        if isinstance(curr_ds_node, Node):
             # Convert date string to datetime date object.
             # Then compare date objects to avoid formatting issues.
             curr_ds = datetime.datetime.strptime(curr_ds_node["key"], "%Y-%m-%d").date()
             if ds != curr_ds:
-                current_app.logger.debug("Trying to set date from {curr_ds} to {ds}".format(curr_ds=curr_ds, ds=ds))
                 # Remove current link from organization to date
-                ns.remove_relation_node(start_node=self.org_node, end_node=curr_ds_node, rel_type=org2date)
+                ns.remove_relation(start_nid=self.org_node['nid'], end_nid=curr_ds_node['nid'], rel_type=org2date)
                 # Check if date (day, month, year) can be removed.
                 # Don't remove single date, clear all dates that can be removed. This avoids the handling of key
                 # because date nodes don't have a nid.
-                ns.clear_date()
+                ns.clear_orphan(lbl_day)
             else:
                 # Link organization to date exists and no need to change
                 return True
@@ -1092,7 +1091,7 @@ def organization_delete(org_id=None):
         ns.remove_node_force(nid=org_id)
         # Check if this results in orphan dates, remove these dates
         current_app.logger.debug("Then remove all orphan dates")
-        ns.clear_date()
+        ns.clear_orphan(lbl_day)
         # Check if this results in orphan locations, remove these locations.
         current_app.logger.debug("Trying to delete orphan organizations.")
         ns.clear_locations()
@@ -1268,7 +1267,6 @@ def get_race_list(org_id):
     This function will return a list of races for an organization ID
 
     :param org_id: nid of the organization
-
     :return: List of races (empty list if there are no races).
     """
     return ns.get_race_list(org_id)
@@ -1686,7 +1684,6 @@ def results_for_mf(mf):
     This method will consolidate results for all categories for the MF.
 
     :param mf: Dames / Heren
-
     :return: List sorted per category and on points within category
     """
     results = []

@@ -80,6 +80,7 @@ def init_loghandler(scriptname, logdir, loglevel):
     Format of the logmessage is specified in basicConfig function.
     This is for Log Handler configuration. If basic log file configuration is required, then use init_logfile.
     Review logger, there seems to be a conflict with the flask logger.
+
     :param scriptname: Name of the calling module.
     :param logdir: Directory of the logfile.
     :param loglevel: The loglevel for logging.

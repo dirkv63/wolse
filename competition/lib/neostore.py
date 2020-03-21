@@ -102,19 +102,20 @@ class NeoStore:
         self.graph.merge(rel)
         return
 
-    def clear_date(self):
+    def clear_orphan(self, lbl):
         """
-        This method will clear date nodes that are no longer connected with other nodes.
+        This method will clear nodes that are no longer connected with other nodes.
 
+        :param lbl: Label for which orphan nodes need to be removed.
         :return:
         """
-        current_app.logger.info("Clearing orphan date nodes")
+        current_app.logger.info(f"Clearing orphan {lbl} nodes")
         query = """
             MATCH (n:{label})-[rel]-()
             WITH n, count(rel) as rel_cnt
             WHERE rel_cnt=0
             DETACH DELETE n
-        """.format(label=lbl_day)
+        """.format(label=lbl)
         self.graph.run(query)
         return
 
@@ -765,6 +766,7 @@ class NeoStore:
               AND end_node.nid='{end_nid}'
             DELETE rel_type
         """.format(rel_type=rel_type, start_nid=start_nid, end_nid=end_nid)
+        current_app.logger.warning(f"Ready to run {query}")
         self.graph.run(query)
         return
 
