@@ -766,7 +766,7 @@ class NeoStore:
               AND end_node.nid='{end_nid}'
             DELETE rel_type
         """.format(rel_type=rel_type, start_nid=start_nid, end_nid=end_nid)
-        current_app.logger.warning("Ready to run {query}"format(query=query))
+        current_app.logger.warning("Ready to run {query}".format(query=query))
         self.graph.run(query)
         return
 
