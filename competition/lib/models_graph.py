@@ -580,7 +580,6 @@ class Organization:
 
         :param properties: Modified set of properties for the node. These properties are: name, location, datestamp and
          org_type. Datestamp must be of the form 'YYYY-MM-DD'
-
         :return: True if the organization has been updated, False if the organization (name, location, date) existed
          already. A change in Organization Type only is also a successful (True) change.
         """
@@ -747,20 +746,19 @@ m
         This method will set or update the Organization Type. In case of update Organization Type, then the current link
         needs to be removed and the new link is set.
 
-
         :param org_type: 'Wedstrijd' or 'Deelname"
-
         :return: True if org_type is set (or changed), False if org_type is not changed.
         """
         # Todo: Add link to recalculate points in the races (this link is in org edit!)
-        if self.get_org_type():
-            if self.get_org_type == org_type:
+        prev_org_type = self.get_org_type()
+        if prev_org_type:
+            if prev_org_type == org_type:
                 # All set, return
                 return False
             else:
                 # Org Type needs to change, remove here.
                 org_type_node = ns.get_endnode(start_node=self.org_node, rel_type=org2type)
-                ns.remove_relation_node(start_node=self.org_node, rel_type=org2type, end_node=org_type_node)
+                ns.remove_relation(start_nid=self.org_node['nid'], rel_type=org2type, end_nid=org_type_node['nid'])
         # Set the organization type
         org_type_node = get_org_type_node(org_type)
         ns.create_relation(from_node=self.org_node, rel=org2type, to_node=org_type_node)
@@ -1230,7 +1228,7 @@ def link_mf(mf, node, rel):
     if isinstance(current_mf, Node):
         if current_mf["name"] != mf_name:
             # Remove link to current node
-            ns.remove_relation_node(start_node=node, end_node=current_mf, rel_type=rel)
+            ns.remove_relation(start_nid=node['nid'], end_nid=current_mf['nid'], rel_type=rel)
         else:
             current_app.logger.info("No changes required...")
             # Link from race to mf exist, all OK!

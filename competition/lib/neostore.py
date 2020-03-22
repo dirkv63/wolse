@@ -770,23 +770,6 @@ class NeoStore:
         self.graph.run(query)
         return
 
-    def remove_relation_node(self, start_node=None, end_node=None, rel_type=None):
-        """
-        This method will remove the relation rel_type between start_node and end_node where relation is type rel_type.
-        The goal is to use the
-
-        :param start_node:
-        :param end_node:
-        :param rel_type:
-        :return:
-        """
-        # Todo: rename the method to remove_relation.
-        rel = Relationship(start_node, rel_type, end_node)
-        # Do I need to merge first?
-        # self.graph.merge(rel)
-        self.graph.separate(rel)
-        return
-
     def set_node_nid(self, node_id):
         """
         This method will set a nid for node with node_id. This should be done only for calendar functions.
