@@ -1,13 +1,8 @@
-# import competition.models_graph as mg
-# import logging
-# import datetime
 from competition.lib import my_env, models_graph as mg
-# from lib import neostore
 from flask import render_template, flash, current_app, redirect, url_for, request
 from flask_login import login_required, login_user, logout_user
 from .forms import *
 from . import main
-# from ..models_sql import User
 
 # The participant properties that can be set (not calculated)
 """
@@ -64,19 +59,6 @@ def location_add():
         else:
             flash("Form did not validate on submit, how did this happen?", "error")
         return redirect(ref or url_for('main.index'))
-
-
-@main.route("/aaa_dates")
-def aaa_dates():
-    """
-    Call to add dates to organizations without date.
-
-    :return:
-    """
-    org_list = mg.aaa_add_dates()
-    org_names = [org['name'] for org in org_list]
-    current_app.logger.info("Organizations: {org_names}".format(org_names=org_names))
-    return redirect(url_for('main.index'))
 
 
 @main.route('/initenv')
@@ -557,6 +539,7 @@ def results(mf, cat, person_id=None):
         param_dict["races"] = races
         param_dict["person"] = person_dict
     return render_template("result_list.html", **param_dict)
+
 
 @main.route('/overview/<mf>', methods=['GET'])
 def overview(mf):
