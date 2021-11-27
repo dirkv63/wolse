@@ -30,12 +30,13 @@ def_deelname = "Deelname"
 def_korte_cross = "Korte Cross"
 
 # Categories
-def_cat_list = ["Benjamins °2012",
-                "Benjamins °2011",
-                "Pupillen °2010",
-                "Pupillen °2009",
-                "Miniemen °2008",
-                "Miniemen °2007",
+def_cat_list = ["Kangoeroe",
+                "Benjamins 1",
+                "Benjamins 2",
+                "Pupillen 1",
+                "Pupillen 2",
+                "Miniemen 1",
+                "Miniemen 2",
                 "Kadetten",
                 "Scholieren",
                 "Juniors",

@@ -19,11 +19,14 @@ mf_tx = dict(
 mf_tx_inv = {y: x for x, y in mf_tx.items()}
 
 # Calculate points
-points_for_deelname = 18
+points_for_deelname = 20
 bonus_pk = 3
 bonus_bk = 5
 bonus_mbk = -8
 
+# Deelname only
+# For some categories there is only Deelname - no competition
+deelname_cats = ['Kangoeroe', 'Benjamins']
 
 class User(UserMixin):
     """
@@ -869,7 +872,10 @@ class Race:
                 cat_cnt[cat] += 1
                 cnt += 1
                 if race_type == "Wedstrijd":
-                    points = points_race(cat_cnt[cat])
+                    if get_deelname_cats(self.get_racename()):
+                        points = points_for_deelname
+                    else:
+                        points = points_race(cat_cnt[cat])
                 elif race_type == "Short":
                     points = points_short(cnt)
                 elif race_type == "Deelname":
@@ -1056,6 +1062,17 @@ class Location:
         node = self.find()
         return node
 
+def get_deelname_cats(racename):
+    """
+    This function checks if race is in range for Deelname only
+
+    :param racename: Name of the race
+    :return: True - this race is deelname only, False - this race could be deelname or wedstrijd
+    """
+    for item in deelname_cats:
+        if item in racename:
+            return True
+    return  False
 
 def organization_list():
     """
